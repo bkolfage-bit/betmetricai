@@ -12,7 +12,9 @@ type PickRow = PickListRow;
 export function selectionLabel(p: PickRow): string {
   const v = p.version;
   if (p.pick.market === "moneyline")
-    return `${p.pick.selection === "home" ? p.home.name : p.away.name} ML`;
+    return p.pick.selection === "draw"
+      ? "Draw ML"
+      : `${p.pick.selection === "home" ? p.home.name : p.away.name} ML`;
   if (p.pick.market === "spread")
     return `${p.pick.selection === "home" ? p.home.name : p.away.name} ${fmtLine(v?.line)}`;
   return `${p.pick.selection === "over" ? "Over" : "Under"} ${v?.line ?? ""}`;
@@ -127,6 +129,8 @@ export function PickCard({ row, defaultOpen = false }: { row: PickRow; defaultOp
               <span>{fmtTime(row.event.startTime)}</span>
             )}
             <span className="text-muted-foreground/50">/</span>
+            <span className="font-bold text-foreground/80">{row.sportCode}</span>
+            <span className="text-muted-foreground/50">/</span>
             <span>{row.pick.market}</span>
             {row.versionCount > 1 && (
               <span className="flex items-center gap-1 text-primary">
@@ -176,6 +180,12 @@ export function PickCard({ row, defaultOpen = false }: { row: PickRow; defaultOp
               <p className={cn("font-mono2 text-[10px] tabular-nums", evNum >= 0 ? "text-pos" : "text-neg")}>
                 EV {signedPct(v.ev)} · edge {signedPct(v.probEdge)}
               </p>
+              {(v.modelAgreement || v.modelVersion) && (
+                <p className="font-mono2 text-[9px] tracking-[0.08em] text-muted-foreground">
+                  {v.modelAgreement && <>MODELS AGREE <b className="text-foreground">{v.modelAgreement}</b> · </>}
+                  {v.modelVersion && <>{v.modelVersion}</>}
+                </p>
+              )}
             </div>
             <EdgeGauge score={v.edgeScore} />
             <StatusBadge status={v.status} />

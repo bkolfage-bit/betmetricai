@@ -6,6 +6,7 @@ import {
   aiPickVersions,
   events,
   predictions,
+  sports,
   sportsbooks,
   teams,
 } from "@db/schema";
@@ -34,7 +35,9 @@ async function eventWithTeams(eventId: number) {
 
 export const picksRouter = createRouter({
   /** All picks with their latest version, event and team context. */
-  list: publicQuery.query(async () => {
+  list: publicQuery
+    .input(z.object({ sport: z.string().optional() }).optional())
+    .query(async ({ input }) => {
     const db = getDb();
     const picks = await db.select().from(aiPicks);
     if (picks.length === 0) return [];
@@ -59,20 +62,25 @@ export const picksRouter = createRouter({
     const teamMap = new Map(teamRows.map((t) => [t.id, t]));
     const bookRows = await db.select().from(sportsbooks);
     const bookMap = new Map(bookRows.map((b) => [b.id, b]));
+    const sportRows = await db.select().from(sports);
+    const sportMap = new Map(sportRows.map((s) => [s.id, s.code]));
 
-    const out = picks.map((p) => {
-      const ev = evRows.find((e) => e.id === p.eventId)!;
-      const v = latestByPick.get(p.id) ?? null;
-      return {
-        pick: p,
-        version: v,
-        versionCount: countByPick.get(p.id) ?? 0,
-        event: ev,
-        home: teamMap.get(ev.homeTeamId)!,
-        away: teamMap.get(ev.awayTeamId)!,
-        book: v ? bookMap.get(v.sportsbookId) ?? null : null,
-      };
-    });
+    const out = picks
+      .map((p) => {
+        const ev = evRows.find((e) => e.id === p.eventId)!;
+        const v = latestByPick.get(p.id) ?? null;
+        return {
+          pick: p,
+          version: v,
+          versionCount: countByPick.get(p.id) ?? 0,
+          event: ev,
+          sportCode: sportMap.get(ev.sportId) ?? "",
+          home: teamMap.get(ev.homeTeamId)!,
+          away: teamMap.get(ev.awayTeamId)!,
+          book: v ? bookMap.get(v.sportsbookId) ?? null : null,
+        };
+      })
+      .filter((r) => !input?.sport || r.sportCode === input.sport);
 
     const order = { STRONG_BET: 0, BET: 1, WATCH: 2, HOLD: 3, PASS: 4 };
     out.sort((a, b) => {

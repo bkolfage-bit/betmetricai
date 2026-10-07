@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { EmptyState, SectionHead, StatusBadge } from "@/components/bits";
+import { SportFilter } from "@/components/SportFilter";
 import { cn } from "@/lib/utils";
 import { fmtLine, fmtOdds, num, pct, signedPct, timeAgo } from "@/lib/format";
 
 export default function PlusEV() {
-  const { data } = trpc.picks.list.useQuery(undefined, { refetchInterval: 15000 });
+  const [sport, setSport] = useState<string | null>(null);
+  const { data } = trpc.picks.list.useQuery(sport ? { sport } : undefined, { refetchInterval: 15000 });
   const [minEv, setMinEv] = useState(0);
 
   const rows = useMemo(() => {
@@ -35,11 +37,13 @@ export default function PlusEV() {
         }
       />
 
+      <SportFilter value={sport} onChange={setSport} />
+
       <div className="panel overflow-x-auto rounded-sm">
         <table className="w-full min-w-[760px] border-collapse font-mono2 text-xs">
           <thead>
             <tr className="border-b border-border text-left">
-              {["EVENT", "SELECTION", "BOOK", "PRICE", "MODEL", "IMPLIED", "EDGE", "EV/UNIT", "AI EDGE", "STATUS", "UPDATED"].map((h) => (
+              {["SPORT", "EVENT", "SELECTION", "BOOK", "PRICE", "MODEL", "IMPLIED", "EDGE", "EV/UNIT", "AI EDGE", "STATUS", "UPDATED"].map((h) => (
                 <th key={h} className="label-caps px-3 py-2.5 font-normal">{h}</th>
               ))}
             </tr>
@@ -49,13 +53,14 @@ export default function PlusEV() {
               const v = p.version!;
               return (
                 <tr key={p.pick.id} className="border-b border-border/60 transition-colors last:border-0 hover:bg-secondary/50">
+                  <td className="px-3 py-2.5 font-bold text-muted-foreground">{p.sportCode}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">
                     {p.away.abbr} @ {p.home.abbr}
                     {p.event.status === "live" && <span className="ml-2 text-live">●LIVE</span>}
                   </td>
                   <td className="px-3 py-2.5 font-bold whitespace-nowrap">
                     {p.pick.market === "moneyline"
-                      ? `${p.pick.selection === "home" ? p.home.abbr : p.away.abbr} ML`
+                      ? `${p.pick.selection === "home" ? p.home.abbr : p.pick.selection === "draw" ? "Draw" : p.away.abbr} ML`
                       : p.pick.market === "spread"
                         ? `${p.pick.selection === "home" ? p.home.abbr : p.away.abbr} ${fmtLine(v.line)}`
                         : `${p.pick.selection === "over" ? "Over" : "Under"} ${v.line}`}

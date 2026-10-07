@@ -114,13 +114,16 @@ export const predictions = mysqlTable("predictions", {
   eventId: bigint("eventId", { mode: "number", unsigned: true })
     .notNull()
     .references(() => events.id),
+  modelId: varchar("modelId", { length: 48 }).notNull().default("nfl-ensemble"),
   modelVersion: varchar("modelVersion", { length: 32 }).notNull(),
-  projHomeScore: decimal("projHomeScore", { precision: 5, scale: 1 }).notNull(),
-  projAwayScore: decimal("projAwayScore", { precision: 5, scale: 1 }).notNull(),
-  projSpread: decimal("projSpread", { precision: 5, scale: 1 }).notNull(), // home perspective
-  projTotal: decimal("projTotal", { precision: 5, scale: 1 }).notNull(),
+  projHomeScore: decimal("projHomeScore", { precision: 6, scale: 1 }).notNull(),
+  projAwayScore: decimal("projAwayScore", { precision: 6, scale: 1 }).notNull(),
+  projSpread: decimal("projSpread", { precision: 6, scale: 1 }).notNull(), // home perspective
+  projTotal: decimal("projTotal", { precision: 6, scale: 1 }).notNull(),
   homeWinProb: decimal("homeWinProb", { precision: 5, scale: 4 }).notNull(),
   confidence: decimal("confidence", { precision: 4, scale: 3 }).notNull(),
+  agreement: varchar("agreement", { length: 8 }), // e.g. "4/4"
+  details: text("details"), // JSON: sport-specific distribution params + component votes
   isLive: boolean("isLive").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -148,9 +151,14 @@ export const aiPickVersions = mysqlTable("ai_pick_versions", {
     .references(() => sportsbooks.id),
   modelProb: decimal("modelProb", { precision: 5, scale: 4 }).notNull(),
   impliedProb: decimal("impliedProb", { precision: 5, scale: 4 }).notNull(),
+  noVigProb: decimal("noVigProb", { precision: 5, scale: 4 }),
   probEdge: decimal("probEdge", { precision: 5, scale: 4 }).notNull(),
   ev: decimal("ev", { precision: 6, scale: 4 }).notNull(),
   edgeScore: int("edgeScore").notNull(),
+  confidence: decimal("confidence", { precision: 4, scale: 3 }),
+  modelAgreement: varchar("modelAgreement", { length: 8 }),
+  modelVersion: varchar("modelVersion", { length: 32 }),
+  featureVersion: varchar("featureVersion", { length: 32 }),
   status: mysqlEnum("status", [
     "STRONG_BET",
     "BET",
@@ -194,6 +202,7 @@ export const pickHistory = mysqlTable("pick_history", {
   selection: varchar("selection", { length: 128 }).notNull(),
   odds: int("odds").notNull(),
   edgeScore: int("edgeScore").notNull(),
+  modelProb: decimal("modelProb", { precision: 5, scale: 4 }), // for calibration
   result: mysqlEnum("result", ["won", "lost", "push"]).notNull(),
   units: decimal("units", { precision: 6, scale: 2 }).notNull(),
   clv: decimal("clv", { precision: 6, scale: 3 }).notNull(), // % closing line value
@@ -242,4 +251,105 @@ export const apiLogs = mysqlTable("api_logs", {
   level: mysqlEnum("level", ["info", "warn", "error"]).notNull(),
   message: text("message").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+/* ------------------------- model registry (§12/29) ------------------------ */
+
+/** Sport-specific quantitative inputs for a competitor (team or player). */
+export const teamRatings = mysqlTable("team_ratings", {
+  id: serial("id").primaryKey(),
+  teamId: bigint("teamId", { mode: "number", unsigned: true })
+    .notNull()
+    .references(() => teams.id),
+  featureVersion: varchar("featureVersion", { length: 32 }).notNull(),
+  ratings: text("ratings").notNull(), // JSON — sport-specific feature set
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+/** Model registry: one row per sport model, with ensemble + validation metadata. */
+export const models = mysqlTable("models", {
+  id: serial("id").primaryKey(),
+  modelId: varchar("modelId", { length: 48 }).notNull().unique(), // e.g. nba-ensemble
+  sportCode: varchar("sportCode", { length: 16 }).notNull(),
+  name: varchar("name", { length: 96 }).notNull(),
+  modelVersion: varchar("modelVersion", { length: 32 }).notNull(),
+  featureVersion: varchar("featureVersion", { length: 32 }).notNull(),
+  components: text("components").notNull(), // JSON [{name, weight}]
+  trainingPeriod: varchar("trainingPeriod", { length: 64 }).notNull(),
+  validationPeriod: varchar("validationPeriod", { length: 64 }).notNull(),
+  trainedAt: timestamp("trainedAt").notNull(),
+  metrics: text("metrics").notNull(), // JSON validation metrics (brier, logloss, roi...)
+  status: mysqlEnum("status", ["production", "candidate", "disabled"])
+    .default("production")
+    .notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+/** Continuous model-health monitoring (§22). */
+export const modelHealth = mysqlTable("model_health", {
+  id: serial("id").primaryKey(),
+  modelId: varchar("modelId", { length: 48 }).notNull(),
+  status: mysqlEnum("status", ["HEALTHY", "WARNING", "DEGRADED", "DISABLED"])
+    .notNull(),
+  checks: text("checks").notNull(), // JSON [{name, ok, detail}]
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+/** Monte Carlo simulation runs (§18) — full distributions, not just picks. */
+export const simulationRuns = mysqlTable("simulation_runs", {
+  id: serial("id").primaryKey(),
+  eventId: bigint("eventId", { mode: "number", unsigned: true })
+    .notNull()
+    .references(() => events.id),
+  modelId: varchar("modelId", { length: 48 }).notNull(),
+  sims: int("sims").notNull(),
+  distribution: text("distribution").notNull(), // JSON outcome distribution
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+/** Probability calibration results per model/market (§13). */
+export const calibrationResults = mysqlTable("calibration_results", {
+  id: serial("id").primaryKey(),
+  modelId: varchar("modelId", { length: 48 }).notNull(),
+  market: varchar("market", { length: 32 }).notNull(),
+  sampleSize: int("sampleSize").notNull(),
+  brier: decimal("brier", { precision: 7, scale: 5 }).notNull(),
+  logLoss: decimal("logLoss", { precision: 7, scale: 5 }).notNull(),
+  ece: decimal("ece", { precision: 7, scale: 5 }).notNull(),
+  buckets: text("buckets").notNull(), // JSON reliability curve [{p, freq, n}]
+  computedAt: timestamp("computedAt").defaultNow().notNull(),
+});
+
+/** Chronological out-of-sample backtests (§19). */
+export const backtests = mysqlTable("backtests", {
+  id: serial("id").primaryKey(),
+  modelId: varchar("modelId", { length: 48 }).notNull(),
+  sportCode: varchar("sportCode", { length: 16 }).notNull(),
+  trainWindow: varchar("trainWindow", { length: 64 }).notNull(),
+  testWindow: varchar("testWindow", { length: 64 }).notNull(),
+  picks: int("picks").notNull(),
+  wins: int("wins").notNull(),
+  losses: int("losses").notNull(),
+  pushes: int("pushes").notNull(),
+  winRate: decimal("winRate", { precision: 5, scale: 4 }).notNull(),
+  roi: decimal("roi", { precision: 7, scale: 4 }).notNull(),
+  units: decimal("units", { precision: 8, scale: 2 }).notNull(),
+  avgClv: decimal("avgClv", { precision: 6, scale: 3 }).notNull(),
+  brier: decimal("brier", { precision: 7, scale: 5 }).notNull(),
+  logLoss: decimal("logLoss", { precision: 7, scale: 5 }).notNull(),
+  maxDrawdown: decimal("maxDrawdown", { precision: 7, scale: 2 }).notNull(),
+  avgOdds: int("avgOdds").notNull(),
+  byEdge: text("byEdge").notNull(), // JSON per-edge-band breakdown
+  computedAt: timestamp("computedAt").defaultNow().notNull(),
+});
+
+/** Closing lines captured at event start for CLV (§20). */
+export const closingLines = mysqlTable("closing_lines", {
+  id: serial("id").primaryKey(),
+  pickId: bigint("pickId", { mode: "number", unsigned: true })
+    .notNull()
+    .references(() => aiPicks.id),
+  line: decimal("line", { precision: 6, scale: 1 }),
+  odds: int("odds").notNull(),
+  capturedAt: timestamp("capturedAt").defaultNow().notNull(),
 });

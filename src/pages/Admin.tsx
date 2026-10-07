@@ -7,6 +7,200 @@ import { timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Shield } from "lucide-react";
 
+type EdgeWeightDraft = {
+  probEdge: number;
+  ev: number;
+  confidence: number;
+  agreement: number;
+  lineStability: number;
+};
+
+function ModelRegistry() {
+  const utils = trpc.useUtils();
+  const { data: modelRows, refetch } = trpc.models.list.useQuery();
+  const { data: queue, refetch: refetchQueue } = trpc.models.retrainQueue.useQuery();
+  const updateStatus = trpc.models.updateStatus.useMutation({
+    onSuccess: () => {
+      refetch();
+      utils.models.list.invalidate();
+    },
+  });
+  const retrain = trpc.models.requestRetrain.useMutation({
+    onSuccess: () => refetchQueue(),
+  });
+  const updateWeights = trpc.models.updateEdgeWeights.useMutation();
+  const [weightSport, setWeightSport] = useState<string>("NFL");
+  const { data: weightData } = trpc.models.edgeWeights.useQuery({ sportCode: weightSport });
+  const [draft, setDraft] = useState<EdgeWeightDraft | null>(null);
+
+  useEffect(() => {
+    const w = weightData?.[weightSport];
+    if (w) setDraft({ ...w });
+  }, [weightData, weightSport]);
+
+  return (
+    <>
+      {/* model registry */}
+      <section className="panel overflow-hidden rounded-sm">
+        <p className="label-caps border-b border-border px-4 py-3">
+          Model registry — lifecycle, health and retraining controls
+        </p>
+        <div className="divide-y divide-border">
+          {(modelRows ?? []).map((m) => (
+            <div key={m.modelId} className="flex flex-wrap items-center gap-3 px-4 py-3">
+              <span className="w-24 font-mono2 text-xs font-bold">{m.sportCode}</span>
+              <span className="font-mono2 text-[10px] text-muted-foreground">
+                {m.modelId} · v{m.modelVersion}
+              </span>
+              <span
+                className={cn(
+                  "rounded-sm border px-2 py-0.5 font-mono2 text-[9px] font-bold",
+                  m.healthStatus === "HEALTHY" && "border-[#34d399]/40 text-pos",
+                  m.healthStatus === "WARNING" && "border-[#fbbf24]/40 text-warn",
+                  (m.healthStatus === "DEGRADED" || m.healthStatus === "DISABLED") &&
+                    "border-[#f87171]/40 text-neg",
+                )}
+              >
+                {m.healthStatus}
+              </span>
+              <span className="min-w-0 flex-1" />
+              <button
+                onClick={() =>
+                  updateStatus.mutate({
+                    modelId: m.modelId,
+                    status: m.status === "disabled" ? "production" : "disabled",
+                  })
+                }
+                disabled={updateStatus.isPending}
+                className={cn(
+                  "min-h-[36px] rounded-sm border px-3 font-mono2 text-[10px] font-bold",
+                  m.status === "disabled"
+                    ? "border-[#f87171]/40 text-neg"
+                    : "border-[#34d399]/40 text-pos",
+                )}
+              >
+                {m.status.toUpperCase()}
+              </button>
+              <button
+                onClick={() => retrain.mutate({ modelId: m.modelId })}
+                disabled={retrain.isPending}
+                className="min-h-[36px] rounded-sm border border-primary/40 px-3 font-mono2 text-[10px] font-bold text-primary disabled:opacity-40"
+              >
+                {retrain.isPending ? "VALIDATING…" : "RETRAIN"}
+              </button>
+            </div>
+          ))}
+        </div>
+        {retrain.data && (
+          <div className="border-t border-border px-4 py-3">
+            <p className="label-caps mb-2" style={{ fontSize: 8 }}>
+              Validation gates — {retrain.data.passed ? "PASSED, queued for admin review" : "FAILED"}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {retrain.data.gates.map((g) => (
+                <span
+                  key={g.name}
+                  title={g.detail}
+                  className={cn(
+                    "rounded-sm border px-2 py-1 font-mono2 text-[9px] font-bold",
+                    g.ok ? "border-[#34d399]/40 text-pos" : "border-[#f87171]/40 text-neg",
+                  )}
+                >
+                  {g.ok ? "✓" : "✗"} {g.name}
+                </span>
+              ))}
+            </div>
+            <p className="mt-2 font-mono2 text-[10px] text-muted-foreground">
+              Candidate models are never auto-deployed — production promotion requires admin review.
+            </p>
+          </div>
+        )}
+        {(queue ?? []).length > 0 && (
+          <div className="border-t border-border px-4 py-3">
+            <p className="label-caps mb-2" style={{ fontSize: 8 }}>Retrain review queue</p>
+            {(queue ?? []).map((q, i) => (
+              <p key={i} className="font-mono2 text-[10px] text-muted-foreground">
+                {q.modelId} — requested {timeAgo(q.requestedAt)} · review:{" "}
+                <b className="text-warn">{q.review.toUpperCase()}</b>
+              </p>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* edge weight editor */}
+      <section className="panel rounded-sm p-5">
+        <p className="label-caps mb-1">AI Edge Score weights — per sport</p>
+        <p className="mb-4 text-[11px] text-muted-foreground">
+          Controls how probability edge, EV, confidence, model agreement and line stability blend
+          into the 0–100 AI Edge Score. Applies to new pick versions immediately.
+        </p>
+        <div className="mb-4 flex flex-wrap gap-1.5">
+          {(modelRows ?? []).map((m) => (
+            <button
+              key={m.sportCode}
+              onClick={() => setWeightSport(m.sportCode)}
+              className={cn(
+                "min-h-[36px] rounded-sm border px-2.5 font-mono2 text-[10px] font-bold tracking-[0.1em]",
+                weightSport === m.sportCode
+                  ? "border-primary bg-live-dim text-primary"
+                  : "border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {m.sportCode}
+            </button>
+          ))}
+        </div>
+        {draft && (
+          <div className="space-y-3">
+            {(
+              [
+                ["PROB EDGE", "probEdge", 0, 1],
+                ["EV", "ev", 0, 1],
+                ["CONFIDENCE", "confidence", 0, 0.5],
+                ["AGREEMENT", "agreement", 0, 0.5],
+                ["LINE STABILITY", "lineStability", 0, 0.5],
+              ] as const
+            ).map(([label, key, lo, hi]) => (
+              <div key={key} className="flex items-center gap-3">
+                <span className="w-28 font-mono2 text-[11px] text-muted-foreground">{label}</span>
+                <input
+                  type="range"
+                  min={lo}
+                  max={hi}
+                  step={0.01}
+                  value={draft[key]}
+                  onChange={(e) => setDraft({ ...draft, [key]: Number(e.target.value) })}
+                  className="flex-1 accent-[#22d3ee]"
+                />
+                <span className="w-12 text-right font-mono2 text-sm font-bold tabular-nums text-primary">
+                  {draft[key].toFixed(2)}
+                </span>
+              </div>
+            ))}
+            <button
+              onClick={() =>
+                updateWeights.mutate({ sportCode: weightSport, weights: draft })
+              }
+              disabled={updateWeights.isPending}
+              className="mt-2 min-h-[44px] w-full rounded-sm bg-primary font-mono2 text-[11px] font-bold tracking-[0.16em] text-primary-foreground disabled:opacity-40"
+            >
+              {updateWeights.isPending
+                ? "APPLYING…"
+                : updateWeights.data
+                  ? `APPLIED TO ${weightSport}`
+                  : `APPLY ${weightSport} WEIGHTS`}
+            </button>
+            {updateWeights.error && (
+              <p className="font-mono2 text-[10px] text-neg">{updateWeights.error.message}</p>
+            )}
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+
 export default function Admin() {
   const { user, isLoading } = useAuth();
   const { data, refetch } = trpc.admin.stats.useQuery(undefined, {
@@ -83,8 +277,8 @@ export default function Admin() {
               <span className="font-bold text-warn">DEMO — SIMULATED DATA</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">MODEL</span>
-              <span>nfl-ensemble-v1.3 (Elo + regression + GBM)</span>
+              <span className="text-muted-foreground">MODELS</span>
+              <span>11 sport ensembles — registry below</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">STRIPE</span>
@@ -156,6 +350,8 @@ export default function Admin() {
           </div>
         </section>
       </div>
+
+      <ModelRegistry />
 
       {/* sportsbooks */}
       <section className="panel overflow-hidden rounded-sm">

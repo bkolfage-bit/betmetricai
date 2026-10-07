@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { SectionHead, Sparkline } from "@/components/bits";
+import { SportFilter } from "@/components/SportFilter";
 import { fmtOdds, fmtTime, num, pct, signedPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export default function Performance() {
-  const { data } = trpc.performance.summary.useQuery();
+  const [sport, setSport] = useState<string | null>(null);
+  const { data } = trpc.performance.summary.useQuery(sport ? { sport } : undefined);
   if (!data) {
     return <div className="panel animate-pulse rounded-sm p-10 text-center font-mono2 text-xs text-muted-foreground">LOADING AUDIT TRAIL…</div>;
   }
@@ -17,6 +20,8 @@ export default function Performance() {
         title="AI performance — full transparency"
         sub="Every graded pick is auditable. Losing picks are never hidden, records are never restated."
       />
+
+      <SportFilter value={sport} onChange={setSport} />
 
       {/* headline stats */}
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-border bg-border font-mono2 sm:grid-cols-4 lg:grid-cols-8">
@@ -47,6 +52,33 @@ export default function Performance() {
         <div className="overflow-x-auto">
           <Sparkline points={curve} width={900} height={180} color="#34d399" baseline={0} />
         </div>
+      </section>
+
+      {/* by sport */}
+      <section className="panel overflow-x-auto rounded-sm">
+        <p className="label-caps border-b border-border px-4 py-3">Performance by sport — every model, fully audited</p>
+        <table className="w-full min-w-[720px] border-collapse font-mono2 text-xs">
+          <thead>
+            <tr className="border-b border-border text-left">
+              {["SPORT", "PICKS", "WIN%", "ROI", "UNITS", "AVG CLV", "+CLV RATE"].map((h) => (
+                <th key={h} className="label-caps px-4 py-2 font-normal">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.sports.map((sp) => (
+              <tr key={sp.sportCode} className="border-b border-border/60 last:border-0">
+                <td className="px-4 py-2.5 font-bold">{sp.sportCode}</td>
+                <td className="px-4 py-2.5 tabular-nums">{sp.total}</td>
+                <td className="px-4 py-2.5 tabular-nums">{pct(sp.winRate, 0)}</td>
+                <td className={cn("px-4 py-2.5 tabular-nums", sp.roi >= 0 ? "text-pos" : "text-neg")}>{signedPct(sp.roi)}</td>
+                <td className={cn("px-4 py-2.5 tabular-nums", sp.units >= 0 ? "text-pos" : "text-neg")}>{sp.units.toFixed(1)}u</td>
+                <td className={cn("px-4 py-2.5 tabular-nums", sp.avgClv >= 0 ? "text-pos" : "text-neg")}>{sp.avgClv.toFixed(2)}%</td>
+                <td className="px-4 py-2.5 tabular-nums">{pct(sp.posClvPct, 0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -108,7 +140,7 @@ export default function Performance() {
         <table className="w-full min-w-[720px] border-collapse font-mono2 text-xs">
           <thead>
             <tr className="border-b border-border text-left">
-              {["DATE", "EVENT", "SELECTION", "ODDS", "EDGE", "RESULT", "UNITS", "CLV"].map((h) => (
+              {["DATE", "SPORT", "EVENT", "SELECTION", "ODDS", "EDGE", "RESULT", "UNITS", "CLV"].map((h) => (
                 <th key={h} className="label-caps px-4 py-2 font-normal">{h}</th>
               ))}
             </tr>
@@ -117,6 +149,7 @@ export default function Performance() {
             {data.recent.map((r) => (
               <tr key={r.id} className="border-b border-border/60 last:border-0 hover:bg-secondary/50">
                 <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">{fmtTime(r.placedAt)}</td>
+                <td className="px-4 py-2.5 font-bold text-muted-foreground">{r.sportCode}</td>
                 <td className="px-4 py-2.5">{r.eventLabel}</td>
                 <td className="whitespace-nowrap px-4 py-2.5 font-bold">{r.selection}</td>
                 <td className="px-4 py-2.5 tabular-nums">{fmtOdds(r.odds)}</td>

@@ -8,6 +8,7 @@ import Props from "./pages/Props";
 import Parlays from "./pages/Parlays";
 import LineMovement from "./pages/LineMovement";
 import Sports from "./pages/Sports";
+import ModelDetail from "./pages/ModelDetail";
 import Assistant from "./pages/Assistant";
 import Tracker from "./pages/Tracker";
 import Performance from "./pages/Performance";
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/parlays" element={<Parlays />} />
         <Route path="/line-movement" element={<LineMovement />} />
         <Route path="/sports" element={<Sports />} />
+        <Route path="/sports/:modelId" element={<ModelDetail />} />
         <Route path="/assistant" element={<Assistant />} />
         <Route path="/tracker" element={<Tracker />} />
         <Route path="/performance" element={<Performance />} />

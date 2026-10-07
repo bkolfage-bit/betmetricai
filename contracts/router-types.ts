@@ -17,3 +17,6 @@ export type PerfSummary = RouterOutputs["performance"]["summary"];
 export type UserBet = RouterOutputs["tracker"]["list"][number];
 export type ParlayResult = RouterOutputs["parlays"]["suggest"];
 export type AdminStats = RouterOutputs["admin"]["stats"];
+export type ModelListRow = RouterOutputs["models"]["list"][number];
+export type ModelDetail = NonNullable<RouterOutputs["models"]["detail"]>;
+export type SportRow = RouterOutputs["models"]["sports"][number];

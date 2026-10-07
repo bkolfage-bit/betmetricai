@@ -5,6 +5,11 @@
  * While `data_mode = DEMO`, it drives the same pipeline the real feeds
  * would drive: new odds snapshots → model recompute → new pick versions
  * → alerts. Nothing is overwritten; every change is versioned.
+ *
+ * Multi-sport: every live event progresses on its own sport's clock,
+ * scoring rhythm, and live model (each sport module's `live` config). Soccer is
+ * priced 3-way (home/draw/away); totals/spreads evaluate against the
+ * sport's live distribution (Poisson or normal).
  */
 import { getDb } from "../queries/connection";
 import {
@@ -14,16 +19,21 @@ import {
   events,
   oddsSnapshots,
   predictions,
+  sports,
   sportsbooks,
 } from "@db/schema";
 import { and, eq, lt } from "drizzle-orm";
-import { normCdf } from "./edge";
+import { normCdf, probToAmerican } from "../engine/probability";
+import { poissonPmf } from "../engine/probability";
 import { recomputeEventPicks } from "../engine/recompute";
+import { SPORT_MODELS } from "../models";
+import type { LiveConfig } from "../models/interface";
 
 const TICK_MS = 40_000;
 /** Game-time acceleration for live demos (game minutes per real minute). */
 const GAME_SPEED = 2.0;
-const NFL_MARGIN_SD = 13.5;
+/** game minutes advanced per tick */
+const TICK_GAME_MIN = (TICK_MS / 60000) * GAME_SPEED;
 
 let started = false;
 
@@ -52,14 +62,142 @@ function roundHalf(n: number): number {
   return Math.round(n * 2) / 2;
 }
 
+/* ---------------- sport-specific live presentation ---------------- */
+
+function periodLabel(code: string, idx: number): string {
+  switch (code) {
+    case "NFL":
+    case "NCAAF":
+    case "NBA":
+      return `Q${idx}`;
+    case "NCAAB":
+      return `H${idx}`;
+    case "MLB":
+      return `T${idx}`;
+    case "NHL":
+      return `P${idx}`;
+    case "SOCCER":
+      return idx === 1 ? "1H" : "2H";
+    case "TENNIS":
+      return `S${idx}`;
+    case "GOLF":
+    case "UFC":
+      return `R${idx}`;
+    default:
+      return "LIVE";
+  }
+}
+
+/** Clock display for the current position in the game. */
+function clockLabel(code: string, cfg: LiveConfig, gameMin: number): string | null {
+  if (code === "SOCCER") return `${Math.min(90, Math.floor(gameMin))}'`;
+  if (code === "TENNIS" || code === "GOLF" || code === "MOTORSPORTS" || code === "MLB")
+    return null;
+  const per = cfg.gameMinutes / cfg.periods;
+  const idx = Math.min(cfg.periods, Math.floor(gameMin / per) + 1);
+  const clockSec = Math.max(0, Math.round((per * idx - gameMin) * 60));
+  return `${Math.floor(clockSec / 60)}:${String(clockSec % 60).padStart(2, "0")}`;
+}
+
+/** Points added by one scoring event. */
+function scoreStep(code: string): number {
+  switch (code) {
+    case "NFL":
+    case "NCAAF":
+      return Math.random() < 0.62 ? 7 : 3;
+    case "NBA":
+    case "NCAAB":
+      return Math.random() < 0.7 ? 2 : 3;
+    case "MLB":
+      return Math.random() < 0.85 ? 1 : 2;
+    default:
+      return 1; // NHL/soccer goals, tennis games, golf strokes, UFC rounds, laps
+  }
+}
+
+/** Average points per scoring event (drives per-tick scoring probability). */
+function avgStep(code: string): number {
+  switch (code) {
+    case "NFL":
+      return 5.5;
+    case "NCAAF":
+      return 5.6;
+    case "NBA":
+    case "NCAAB":
+      return 2.2;
+    case "MLB":
+      return 1.15;
+    default:
+      return 1;
+  }
+}
+
+/** Advance one side's score with probability matched to the sport's scoring rate. */
+function maybeScore(current: number, ratePerGame: number, cfg: LiveConfig, code: string): number {
+  const expectedPts = (ratePerGame * TICK_GAME_MIN) / cfg.gameMinutes;
+  const p = Math.min(1, expectedPts / avgStep(code));
+  return Math.random() < p ? current + scoreStep(code) : current;
+}
+
+/* ---------------- live model ---------------- */
+
+interface PreDetails {
+  drawProb?: number;
+  agreementFrac?: number;
+  agreement?: string;
+  dist?:
+    | { kind: "normal"; marginMean: number; marginSd: number; totalMean: number; totalSd: number }
+    | { kind: "poisson"; lambdaHome: number; lambdaAway: number; tie: "draw" | "fifty" };
+}
+
+function parseDetails(raw: string | null): PreDetails {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as PreDetails;
+  } catch {
+    return {};
+  }
+}
+
+/** P(final home score > final away score) etc. from remaining Poisson lambdas. */
+function poissonLiveOutcome(
+  home: number,
+  away: number,
+  lamHRem: number,
+  lamARem: number,
+): { homeWin: number; draw: number } {
+  let homeWin = 0;
+  let draw = 0;
+  const maxRem = Math.max(10, Math.ceil(Math.max(lamHRem, lamARem) + 8));
+  const hP: number[] = [];
+  for (let i = 0; i <= maxRem; i++) {
+    hP.push(poissonPmf(i, Math.max(0.05, lamHRem)));
+  }
+  for (let h = 0; h <= maxRem; h++) {
+    for (let a = 0; a <= maxRem; a++) {
+      const p = hP[h] * poissonPmf(a, Math.max(0.05, lamARem));
+      const fh = home + h;
+      const fa = away + a;
+      if (fh > fa) homeWin += p;
+      else if (fh === fa) draw += p;
+    }
+  }
+  return { homeWin, draw };
+}
+
+/* ---------------- event lifecycle ---------------- */
+
 /** Promote scheduled events whose start time has passed to LIVE. */
 async function promoteEvents() {
   const db = getDb();
   const due = await db
-    .select()
+    .select({ ev: events, code: sports.code })
     .from(events)
+    .innerJoin(sports, eq(events.sportId, sports.id))
     .where(and(eq(events.status, "scheduled"), lt(events.startTime, new Date())));
-  for (const ev of due) {
+  for (const { ev, code } of due) {
+    const model = SPORT_MODELS[code];
+    const cfg = model?.live;
     await db
       .update(events)
       .set({
@@ -67,47 +205,54 @@ async function promoteEvents() {
         startTime: new Date(),
         homeScore: 0,
         awayScore: 0,
-        period: "Q1",
-        clock: "15:00",
+        period: periodLabel(code, 1),
+        clock: cfg ? clockLabel(code, cfg, 0) : null,
       })
       .where(eq(events.id, ev.id));
     await db.insert(alerts).values({
       type: "system",
       title: "Game went live",
-      message: `Event #${ev.id} is now LIVE — switched to the live prediction model.`,
+      message: `Event #${ev.id} (${code}) is now LIVE — switched to the live prediction model.`,
     });
-    log("simulator", "info", `event ${ev.id} promoted to live`);
+    log("simulator", "info", `event ${ev.id} (${code}) promoted to live`);
   }
 }
 
 /** Advance live games: clock, score, live model, live odds, pick recompute. */
 async function advanceLiveGames() {
   const db = getDb();
-  const live = await db.select().from(events).where(eq(events.status, "live"));
-  for (const ev of live) {
-    const elapsedMin = (Date.now() - ev.startTime.getTime()) / 60000;
-    const gameMin = Math.min(60, elapsedMin * GAME_SPEED);
-    const progress = gameMin / 60;
+  const live = await db
+    .select({ ev: events, code: sports.code })
+    .from(events)
+    .innerJoin(sports, eq(events.sportId, sports.id))
+    .where(eq(events.status, "live"));
 
-    // scoring: chance per tick scales with remaining time
+  for (const { ev, code } of live) {
+    const model = SPORT_MODELS[code];
+    if (!model) continue;
+    const cfg = model.live;
+
+    const elapsedMin = (Date.now() - ev.startTime.getTime()) / 60000;
+    const gameMin = Math.min(cfg.gameMinutes, elapsedMin * GAME_SPEED);
+    const progress = gameMin / cfg.gameMinutes;
+    const finished = gameMin >= cfg.gameMinutes;
+
+    // scoring
     let home = ev.homeScore ?? 0;
     let away = ev.awayScore ?? 0;
-    const r = Math.random();
-    if (r < 0.16) home += Math.random() < 0.62 ? 7 : 3;
-    else if (r < 0.32) away += Math.random() < 0.62 ? 7 : 3;
+    if (!finished) {
+      home = maybeScore(home, cfg.homeScoreRate, cfg, code);
+      away = maybeScore(away, cfg.awayScoreRate, cfg, code);
+    }
 
-    const quarter = Math.min(4, Math.floor(gameMin / 15) + 1);
-    const clockSec = Math.max(0, Math.round((15 - (gameMin % 15)) * 60));
-    const clock = `${Math.floor(clockSec / 60)}:${String(clockSec % 60).padStart(2, "0")}`;
-    const finished = gameMin >= 60;
-
+    const periodIdx = Math.min(cfg.periods, Math.floor((gameMin / cfg.gameMinutes) * cfg.periods) + 1);
     await db
       .update(events)
       .set({
         homeScore: home,
         awayScore: away,
-        period: finished ? "FT" : `Q${quarter}`,
-        clock: finished ? "0:00" : clock,
+        period: finished ? "FT" : periodLabel(code, periodIdx),
+        clock: finished ? null : clockLabel(code, cfg, gameMin),
         status: finished ? "final" : "live",
       })
       .where(eq(events.id, ev.id));
@@ -122,116 +267,123 @@ async function advanceLiveGames() {
     if (pre.length === 0) continue;
     const preSpread = parseFloat(pre[0].projSpread);
     const preTotal = parseFloat(pre[0].projTotal);
+    const preDetails = parseDetails(pre[0].details);
 
     const margin = home - away;
     const scored = home + away;
-    // live final-margin projection: current margin + remaining pregame edge
-    const liveSpread = margin + preSpread * (1 - progress) * 0.85;
-    // live total projection: points scored + expected remaining scoring
-    const liveTotal = scored + preTotal * (1 - progress) * 0.9;
-    const sdRemain = Math.max(2.5, NFL_MARGIN_SD * Math.sqrt(1 - progress));
-    const homeWinProb = normCdf(liveSpread / sdRemain);
+    let homeWinProb: number;
+    let drawProb = 0;
+    let liveDist: NonNullable<PreDetails["dist"]>;
+
+    if (preDetails.dist?.kind === "poisson") {
+      // remaining-time-scaled Poisson (soccer / NHL / MLB)
+      const rem = 1 - progress;
+      const lamHRem = preDetails.dist.lambdaHome * rem;
+      const lamARem = preDetails.dist.lambdaAway * rem;
+      const out = poissonLiveOutcome(home, away, lamHRem, lamARem);
+      drawProb = preDetails.dist.tie === "draw" ? out.draw : 0;
+      homeWinProb =
+        preDetails.dist.tie === "draw"
+          ? out.homeWin
+          : out.homeWin + out.draw * 0.5; // OT/SO coin flip (NHL)
+      liveDist = {
+        kind: "poisson",
+        lambdaHome: home + lamHRem,
+        lambdaAway: away + lamARem,
+        tie: preDetails.dist.tie,
+      };
+    } else {
+      // normal margin/total sports
+      const liveSpread = margin + preSpread * (1 - progress) * 0.85;
+      const liveTotal = scored + preTotal * (1 - progress) * 0.9;
+      const sdRemain = Math.max(cfg.marginSd * 0.2, cfg.marginSd * Math.sqrt(1 - progress));
+      const totSdRemain = Math.max(cfg.totalSd * 0.25, cfg.totalSd * Math.sqrt(1 - progress));
+      homeWinProb = normCdf(liveSpread / sdRemain);
+      liveDist = {
+        kind: "normal",
+        marginMean: liveSpread,
+        marginSd: sdRemain,
+        totalMean: liveTotal,
+        totalSd: totSdRemain,
+      };
+    }
+
+    const liveSpreadOut =
+      liveDist.kind === "normal" ? liveDist.marginMean : liveDist.lambdaHome - liveDist.lambdaAway;
+    const liveTotalOut =
+      liveDist.kind === "normal" ? liveDist.totalMean : liveDist.lambdaHome + liveDist.lambdaAway;
+    const projHome =
+      liveDist.kind === "poisson" ? liveDist.lambdaHome : (liveTotalOut + liveSpreadOut) / 2;
+    const projAway =
+      liveDist.kind === "poisson" ? liveDist.lambdaAway : (liveTotalOut - liveSpreadOut) / 2;
 
     await db.insert(predictions).values({
       eventId: ev.id,
-      modelVersion: "nfl-ensemble-v1.3-live",
-      projHomeScore: String(Math.max(home, (home + liveSpread / 2)).toFixed(1)),
-      projAwayScore: String(Math.max(away, (away - liveSpread / 2)).toFixed(1)),
-      projSpread: liveSpread.toFixed(1),
-      projTotal: liveTotal.toFixed(1),
+      modelId: model.modelId,
+      modelVersion: `${model.modelVersion}-live`,
+      projHomeScore: String(Math.max(home, projHome).toFixed(1)),
+      projAwayScore: String(Math.max(away, projAway).toFixed(1)),
+      projSpread: liveSpreadOut.toFixed(1),
+      projTotal: liveTotalOut.toFixed(1),
       homeWinProb: homeWinProb.toFixed(4),
       confidence: (0.62 + 0.2 * progress).toFixed(3),
       isLive: true,
+      details: JSON.stringify({
+        drawProb,
+        agreement: preDetails.agreement ?? null,
+        agreementFrac: preDetails.agreementFrac ?? 0.75,
+        dist: liveDist,
+      }),
     });
 
     if (finished) {
       await db.insert(alerts).values({
         type: "system",
         title: "Game final",
-        message: `Event #${ev.id} finished ${away}–${home}. Grading queued.`,
+        message: `Event #${ev.id} (${code}) finished ${away}–${home}. Grading queued.`,
       });
       continue;
     }
 
     // live market prices (with book noise → live +EV windows)
-    const books = await db
-      .select()
-      .from(sportsbooks)
-      .where(eq(sportsbooks.active, true));
-    const marketSpread = roundHalf(-liveSpread + jitter(ev.id, Math.floor(gameMin)) * 1.5);
-    const marketTotal = roundHalf(liveTotal + jitter(ev.id, Math.floor(gameMin) + 7) * 2);
-    const homeMlLive =
-      homeWinProb > 0.5
-        ? Math.round((-100 * homeWinProb) / (1 - homeWinProb) / 5) * 5
-        : Math.round((100 * (1 - homeWinProb)) / homeWinProb / 5) * 5;
+    const books = await db.select().from(sportsbooks).where(eq(sportsbooks.active, true));
+    const marketSpread = roundHalf(-liveSpreadOut + jitter(ev.id, Math.floor(gameMin)) * 1.5);
+    const marketTotal = roundHalf(liveTotalOut + jitter(ev.id, Math.floor(gameMin) + 7) * 2);
+    const mlFromProb = (p: number) => {
+      const adj = Math.min(0.985, Math.max(0.015, p * 1.04)); // bookmaker margin
+      return Math.round(probToAmerican(adj) / 5) * 5;
+    };
+    const homeMlLive = mlFromProb(homeWinProb);
+    const awayProb = 1 - homeWinProb - drawProb;
+    const awayMlLive = mlFromProb(awayProb);
+    const drawMlLive = drawProb > 0 ? mlFromProb(drawProb) : null;
     const now = new Date();
+
     for (const b of books) {
       const j = jitter(b.id, Math.floor(gameMin * 2));
-      await db.insert(oddsSnapshots).values([
-        {
-          eventId: ev.id,
-          sportsbookId: b.id,
-          market: "spread",
-          selection: "home",
-          line: String(marketSpread),
-          odds: -110 + Math.round(j * 8),
-          isLive: true,
-          capturedAt: now,
-        },
-        {
-          eventId: ev.id,
-          sportsbookId: b.id,
-          market: "spread",
-          selection: "away",
-          line: String(-marketSpread),
-          odds: -110 - Math.round(j * 8),
-          isLive: true,
-          capturedAt: now,
-        },
-        {
-          eventId: ev.id,
-          sportsbookId: b.id,
-          market: "total",
-          selection: "over",
-          line: String(marketTotal),
-          odds: -110 + Math.round(j * 6),
-          isLive: true,
-          capturedAt: now,
-        },
-        {
-          eventId: ev.id,
-          sportsbookId: b.id,
-          market: "total",
-          selection: "under",
-          line: String(marketTotal),
-          odds: -110 - Math.round(j * 6),
-          isLive: true,
-          capturedAt: now,
-        },
-        {
-          eventId: ev.id,
-          sportsbookId: b.id,
-          market: "moneyline",
-          selection: "home",
-          line: null,
-          odds: homeMlLive + Math.round(j * 10),
-          isLive: true,
-          capturedAt: now,
-        },
-        {
-          eventId: ev.id,
-          sportsbookId: b.id,
-          market: "moneyline",
-          selection: "away",
-          line: null,
-          odds:
-            homeMlLive < 0
-              ? Math.round((-homeMlLive * 0.85) / 5) * 5 - Math.round(j * 8)
-              : -Math.round((homeMlLive * 1.15) / 5) * 5 - Math.round(j * 8),
-          isLive: true,
-          capturedAt: now,
-        },
-      ]);
+      const rows: Array<typeof oddsSnapshots.$inferInsert> = [];
+      if (model.pickMarkets.includes("spread")) {
+        rows.push(
+          { eventId: ev.id, sportsbookId: b.id, market: "spread", selection: "home", line: String(marketSpread), odds: -110 + Math.round(j * 8), isLive: true, capturedAt: now },
+          { eventId: ev.id, sportsbookId: b.id, market: "spread", selection: "away", line: String(-marketSpread), odds: -110 - Math.round(j * 8), isLive: true, capturedAt: now },
+        );
+      }
+      if (model.pickMarkets.includes("total")) {
+        rows.push(
+          { eventId: ev.id, sportsbookId: b.id, market: "total", selection: "over", line: String(marketTotal), odds: -110 + Math.round(j * 6), isLive: true, capturedAt: now },
+          { eventId: ev.id, sportsbookId: b.id, market: "total", selection: "under", line: String(marketTotal), odds: -110 - Math.round(j * 6), isLive: true, capturedAt: now },
+        );
+      }
+      if (model.pickMarkets.includes("moneyline")) {
+        rows.push(
+          { eventId: ev.id, sportsbookId: b.id, market: "moneyline", selection: "home", line: null, odds: homeMlLive + Math.round(j * 10), isLive: true, capturedAt: now },
+          { eventId: ev.id, sportsbookId: b.id, market: "moneyline", selection: "away", line: null, odds: awayMlLive - Math.round(j * 8), isLive: true, capturedAt: now },
+        );
+        if (drawMlLive !== null) {
+          rows.push({ eventId: ev.id, sportsbookId: b.id, market: "moneyline", selection: "draw", line: null, odds: drawMlLive + Math.round(j * 6), isLive: true, capturedAt: now });
+        }
+      }
+      if (rows.length > 0) await db.insert(oddsSnapshots).values(rows);
     }
     await recomputeEventPicks(ev.id);
   }
@@ -241,18 +393,19 @@ async function advanceLiveGames() {
 async function movePregameMarket() {
   const db = getDb();
   const scheduled = await db
-    .select()
+    .select({ ev: events, code: sports.code })
     .from(events)
+    .innerJoin(sports, eq(events.sportId, sports.id))
     .where(eq(events.status, "scheduled"));
   if (scheduled.length === 0) return;
-  const ev = scheduled[Math.floor(Math.random() * scheduled.length)];
-
-  const books = await db
-    .select()
-    .from(sportsbooks)
-    .where(eq(sportsbooks.active, true));
-  const markets = ["spread", "total", "moneyline"] as const;
+  const { ev, code } = scheduled[Math.floor(Math.random() * scheduled.length)];
+  const model = SPORT_MODELS[code];
+  const markets = (model?.pickMarkets ?? ["spread", "total", "moneyline"]) as Array<
+    "spread" | "total" | "moneyline"
+  >;
   const market = markets[Math.floor(Math.random() * markets.length)];
+
+  const books = await db.select().from(sportsbooks).where(eq(sportsbooks.active, true));
 
   // latest consensus line for the market
   const latest = await db
@@ -315,20 +468,23 @@ async function movePregameMarket() {
       let mlStep = oddsStep;
       if (pre.length > 0) {
         const hwp = parseFloat(pre[0].homeWinProb);
-        const fair =
-          hwp >= 0.5
-            ? Math.round((-100 * hwp) / (1 - hwp) / 5) * 5
-            : Math.round((100 * (1 - hwp)) / hwp / 5) * 5;
+        const fair = Math.round(probToAmerican(Math.min(0.985, Math.max(0.015, hwp))) / 5) * 5;
         const gap = prevHome.odds - fair; // vig pushes favorites more negative
         if (prevHome.odds < 0 && gap < -45) mlStep = 10;
         else if (prevHome.odds < 0 && gap > 25) mlStep = -10;
         else if (prevHome.odds > 0 && gap > 45) mlStep = -10;
         else if (prevHome.odds > 0 && gap < 10) mlStep = 10;
       }
-      await db.insert(oddsSnapshots).values([
+      const rows: Array<typeof oddsSnapshots.$inferInsert> = [
         { eventId: ev.id, sportsbookId: b.id, market, selection: "home", line: null, odds: prevHome.odds + mlStep + Math.round(j * 5), isLive: false, capturedAt: now },
         { eventId: ev.id, sportsbookId: b.id, market, selection: "away", line: null, odds: prevAway.odds - mlStep - Math.round(j * 5), isLive: false, capturedAt: now },
-      ]);
+      ];
+      // soccer 3-way: move the draw price in sympathy
+      const prevDraw = latest.filter((r) => r.selection === "draw" && r.sportsbookId === b.id).pop();
+      if (prevDraw) {
+        rows.push({ eventId: ev.id, sportsbookId: b.id, market, selection: "draw", line: null, odds: prevDraw.odds + Math.round(j * 5) - Math.round(mlStep / 2), isLive: false, capturedAt: now });
+      }
+      await db.insert(oddsSnapshots).values(rows);
     }
   }
 
@@ -349,5 +505,5 @@ export function startSimulator() {
     }
   };
   setInterval(tick, TICK_MS);
-  log("simulator", "info", "market simulator started (DEMO DATA mode)");
+  log("simulator", "info", "market simulator started (DEMO DATA mode, multi-sport)");
 }

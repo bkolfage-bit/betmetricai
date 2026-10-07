@@ -6,35 +6,40 @@ import {
   events,
   oddsSnapshots,
   predictions,
+  sports,
   sportsbooks,
 } from "@db/schema";
 import { and, desc, eq } from "drizzle-orm";
 import {
-  aiEdgeScore,
   americanToImplied,
-  betUpToLine,
-  expectedValue,
   fmtLine,
   fmtOdds,
-  modelProbability,
-  noVig,
-  statusForScore,
-  type Market,
-  type PickStatus,
-} from "../lib/edge";
+  noVigN,
+  probToAmerican,
+} from "./probability";
+import { expectedValue, type Market, type PickStatus } from "../lib/edge";
+import { statusForScore } from "../lib/edge";
 import { getThresholds } from "../lib/config";
+import { marketProbability, type StandardPredictionLike } from "./markets";
+import { aiEdgeScoreEx, getEdgeWeights } from "./edge-score";
+import { SPORT_MODELS } from "../models";
 
 export interface ComputedVersion {
   line: number | null;
   odds: number;
   sportsbookId: number;
   modelProb: number;
-  impliedProb: number;
+  impliedProb: number; // raw implied (with vig)
+  noVigProb: number; // vig-free market probability
   probEdge: number;
   ev: number;
   edgeScore: number;
   status: PickStatus;
   betUpTo: number | null;
+  confidence: number;
+  modelAgreement: string | null;
+  modelVersion: string;
+  featureVersion: string;
 }
 
 /** Latest prediction for an event (prefers live rows for live events). */
@@ -94,6 +99,81 @@ function betterPrice(
   return a.odds > b.odds;
 }
 
+/** Rebuild the standardized prediction view from a stored prediction row. */
+function predLikeFromRow(pred: typeof predictions.$inferSelect): {
+  like: StandardPredictionLike;
+  agreementFrac: number;
+  agreement: string | null;
+} {
+  let details: {
+    dist?: StandardPredictionLike["dist"];
+    drawProb?: number;
+    agreementFrac?: number;
+  } = {};
+  try {
+    details = pred.details ? JSON.parse(pred.details) : {};
+  } catch {
+    details = {};
+  }
+  const projSpread = parseFloat(pred.projSpread);
+  const projTotal = parseFloat(pred.projTotal);
+  return {
+    like: {
+      homeWinProb: parseFloat(pred.homeWinProb),
+      drawProb: details.drawProb ?? 0,
+      dist: details.dist ?? {
+        kind: "normal",
+        marginMean: projSpread,
+        marginSd: 13.5,
+        totalMean: projTotal,
+        totalSd: 10.5,
+      },
+    },
+    agreementFrac: details.agreementFrac ?? 0.75,
+    agreement: pred.agreement ?? null,
+  };
+}
+
+/** Solve the line/price where EV ≈ 0 → the maximum acceptable "bet up to". */
+export function betUpTo(
+  like: StandardPredictionLike,
+  market: Market,
+  selection: string,
+  odds = -110,
+): number | null {
+  if (market === "moneyline") {
+    const p = marketProbability(like, "moneyline", selection, null);
+    if (p <= 0.01 || p >= 0.99) return null;
+    return probToAmerican(p);
+  }
+  if (market === "spread") {
+    const mean = like.dist.marginMean ?? (like.dist.lambdaHome ?? 1) - (like.dist.lambdaAway ?? 1);
+    const fair = selection === "home" ? -mean : mean;
+    let best: number | null = null;
+    for (let d = -30; d <= 30; d += 0.5) {
+      const candidate = Math.round((fair + d) * 2) / 2;
+      const p = marketProbability(like, "spread", selection, candidate);
+      if (expectedValue(p, odds) > 0.005) {
+        if (best === null || candidate < best) best = candidate;
+      }
+    }
+    return best;
+  }
+  // total
+  const mean = like.dist.totalMean ?? (like.dist.lambdaHome ?? 1) + (like.dist.lambdaAway ?? 1);
+  let best: number | null = null;
+  for (let d = -20; d <= 20; d += 0.5) {
+    const candidate = Math.round((mean + d) * 2) / 2;
+    const p = marketProbability(like, "total", selection, candidate);
+    if (expectedValue(p, odds) > 0.005) {
+      if (selection === "over") {
+        if (best === null || candidate > best) best = candidate;
+      } else if (best === null || candidate < best) best = candidate;
+    }
+  }
+  return best;
+}
+
 /**
  * Compute the current version for a pick from verified backend data.
  * Returns null when there is no usable market price (never fabricate).
@@ -102,9 +182,13 @@ export async function computePickVersion(
   pick: typeof aiPicks.$inferSelect,
 ): Promise<ComputedVersion | null> {
   const db = getDb();
-  const ev = await db.select().from(events).where(eq(events.id, pick.eventId));
-  if (ev.length === 0) return null;
-  const event = ev[0];
+  const evRows = await db
+    .select({ event: events, sport: sports })
+    .from(events)
+    .innerJoin(sports, eq(events.sportId, sports.id))
+    .where(eq(events.id, pick.eventId));
+  if (evRows.length === 0) return null;
+  const { event, sport } = evRows[0];
   const isLive = event.status === "live";
   const pred = await latestPrediction(pick.eventId, isLive);
   if (!pred) return null;
@@ -116,43 +200,41 @@ export async function computePickVersion(
   const best = offers.reduce((a, b) => (betterPrice(a, b) ? a : b));
   const line = best.line === null ? null : parseFloat(best.line);
 
-  // two-way no-vig at the best book
-  const otherSide =
-    market === "total"
-      ? pick.selection === "over"
-        ? "under"
-        : "over"
-      : pick.selection === "home"
-        ? "away"
-        : "home";
-  const otherOffers = await latestOddsByBook(pick.eventId, market, otherSide);
-  const otherAtBook = otherOffers.find(
-    (o) => o.sportsbookId === best.sportsbookId,
-  );
-
-  const projSpread = parseFloat(pred.projSpread);
-  const projTotal = parseFloat(pred.projTotal);
-  const homeWinProb = parseFloat(pred.homeWinProb);
+  const { like, agreementFrac, agreement } = predLikeFromRow(pred);
   const confidence = parseFloat(pred.confidence);
+  const modelProb = marketProbability(like, market, pick.selection, line);
 
-  const modelProb = modelProbability(
-    market,
-    pick.selection,
-    line,
-    projSpread,
-    projTotal,
-    homeWinProb,
-  );
-
-  let impliedProb: number;
-  if (otherAtBook) {
-    // noVig returns probabilities aligned to argument order; take ours
-    impliedProb = noVig(best.odds, otherAtBook.odds)[0];
-  } else {
-    impliedProb = americanToImplied(best.odds);
+  // N-way no-vig at the best book (2-way spreads/totals, 3-way soccer ML)
+  const allSelections =
+    market === "moneyline"
+      ? like.drawProb
+        ? ["home", "draw", "away"]
+        : ["home", "away"]
+      : market === "total"
+        ? ["over", "under"]
+        : ["home", "away"];
+  const oddsAtBook: number[] = [];
+  for (const sel of allSelections) {
+    if (sel === pick.selection) {
+      oddsAtBook.push(best.odds);
+      continue;
+    }
+    const other = await latestOddsByBook(pick.eventId, market, sel);
+    const atBook = other.find((o) => o.sportsbookId === best.sportsbookId);
+    if (!atBook) {
+      oddsAtBook.length = 0;
+      break;
+    }
+    oddsAtBook.push(atBook.odds);
   }
+  const rawImplied = americanToImplied(best.odds);
+  const ourIdx = allSelections.indexOf(pick.selection);
+  const noVigProb =
+    oddsAtBook.length === allSelections.length && ourIdx >= 0
+      ? noVigN(oddsAtBook)[ourIdx]
+      : rawImplied;
 
-  const probEdge = modelProb - impliedProb;
+  const probEdge = modelProb - noVigProb;
   const evPerUnit = expectedValue(modelProb, best.odds);
 
   // line stability from recent snapshots at the best book
@@ -181,40 +263,41 @@ export async function computePickVersion(
     stability = Math.max(0, Math.min(1, 1 - sd * 0.5));
   }
 
-  const edgeScore = aiEdgeScore({
+  const weights = await getEdgeWeights(sport.code);
+  const edgeScore = aiEdgeScoreEx({
     probEdge,
     ev: evPerUnit,
     confidence,
+    agreementFrac,
     lineStability: stability,
     dataQuality: 0.9,
+    weights,
   });
   const thresholds = await getThresholds();
+  const model = SPORT_MODELS[sport.code];
 
   return {
     line,
     odds: best.odds,
     sportsbookId: best.sportsbookId,
     modelProb,
-    impliedProb,
+    impliedProb: rawImplied,
+    noVigProb,
     probEdge,
     ev: evPerUnit,
     edgeScore,
     status: statusForScore(edgeScore, thresholds),
-    betUpTo: betUpToLine(
-      market,
-      pick.selection,
-      projSpread,
-      projTotal,
-      homeWinProb,
-      best.odds,
-    ),
+    betUpTo: betUpTo(like, market, pick.selection, best.odds),
+    confidence,
+    modelAgreement: agreement,
+    modelVersion: pred.modelVersion,
+    featureVersion: model?.featureVersion ?? "feat-v1",
   };
 }
 
 function describeChange(
   prev: typeof aiPickVersions.$inferSelect,
   next: ComputedVersion,
-  market: Market,
 ): string {
   const parts: string[] = [];
   const prevLine = prev.line === null ? null : parseFloat(prev.line);
@@ -240,7 +323,6 @@ function describeChange(
       : dEdge > 0.005
         ? "improving the probability edge"
         : "with the model edge roughly unchanged";
-  void market;
   return `${parts.join(" and ")}, ${dir}. ${evTxt}. Status: ${prev.status} → ${next.status}.`;
 }
 
@@ -280,7 +362,7 @@ export async function applyPickVersion(
 
   const nextVersion = prev ? prev.version + 1 : 1;
   const reason = prev
-    ? describeChange(prev, computed, pick.market as Market)
+    ? describeChange(prev, computed)
     : "Initial model evaluation against current market prices.";
 
   await db.insert(aiPickVersions).values({
@@ -291,9 +373,14 @@ export async function applyPickVersion(
     sportsbookId: computed.sportsbookId,
     modelProb: String(computed.modelProb.toFixed(4)),
     impliedProb: String(computed.impliedProb.toFixed(4)),
+    noVigProb: String(computed.noVigProb.toFixed(4)),
     probEdge: String(computed.probEdge.toFixed(4)),
     ev: String(computed.ev.toFixed(4)),
     edgeScore: computed.edgeScore,
+    confidence: String(computed.confidence.toFixed(3)),
+    modelAgreement: computed.modelAgreement,
+    modelVersion: computed.modelVersion,
+    featureVersion: computed.featureVersion,
     status: computed.status,
     betUpTo: computed.betUpTo === null ? null : String(computed.betUpTo),
     changeReason: reason,
@@ -343,7 +430,7 @@ export async function activeBooks() {
 /** Latest odds board for an event: all markets × selections × books. */
 export async function oddsBoard(eventId: number) {
   const markets: Market[] = ["moneyline", "spread", "total"];
-  const sels = ["home", "away", "over", "under"];
+  const sels = ["home", "draw", "away", "over", "under"];
   const board: Record<string, Awaited<ReturnType<typeof latestOddsByBook>>> =
     {};
   for (const m of markets) {

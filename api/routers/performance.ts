@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { createRouter, publicQuery } from "../middleware";
 import { getDb } from "../queries/connection";
 import { pickHistory } from "@db/schema";
@@ -31,14 +32,28 @@ function summarize(rows: Array<typeof pickHistory.$inferSelect>) {
 
 export const performanceRouter = createRouter({
   /** Public, auditable AI performance. Losing picks are never hidden. */
-  summary: publicQuery.query(async () => {
+  summary: publicQuery
+    .input(z.object({ sport: z.string().optional() }).optional())
+    .query(async ({ input }) => {
     const db = getDb();
-    const rows = await db
+    const all = await db
       .select()
       .from(pickHistory)
       .orderBy(asc(pickHistory.placedAt));
+    const rows = input?.sport ? all.filter((r) => r.sportCode === input.sport) : all;
 
     const overall = summarize(rows);
+
+    const bySport = new Map<string, typeof all>();
+    for (const r of all) {
+      const arr = bySport.get(r.sportCode) ?? [];
+      arr.push(r);
+      bySport.set(r.sportCode, arr);
+    }
+    const sports = [...bySport.entries()].map(([sportCode, rs]) => ({
+      sportCode,
+      ...summarize(rs),
+    }));
 
     const byMarket = new Map<string, typeof rows>();
     for (const r of rows) {
@@ -75,6 +90,7 @@ export const performanceRouter = createRouter({
 
     return {
       overall: { ...overall, maxDrawdown },
+      sports,
       markets,
       months,
       curve,

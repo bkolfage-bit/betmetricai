@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { EmptyState, SectionHead } from "@/components/bits";
+import { SportFilter } from "@/components/SportFilter";
 import { fmtLine, fmtOdds, fmtTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -63,21 +64,29 @@ function LineChart({
 }
 
 export default function LineMovement() {
-  const { data: events } = trpc.odds.events.useQuery();
+  const { data: allEvents } = trpc.odds.events.useQuery();
+  const [sport, setSport] = useState<string | null>(null);
+  const events = useMemo(
+    () => (allEvents ?? []).filter((e) => !sport || e.sport.code === sport),
+    [allEvents, sport],
+  );
   const [eventId, setEventId] = useState<number | null>(null);
   const [market, setMarket] = useState<"spread" | "total" | "moneyline">("spread");
   const [selection, setSelection] = useState("home");
 
   const evId = eventId ?? events?.[0]?.event.id ?? null;
+  const currentSport = events.find((e) => e.event.id === evId)?.sport.code ?? null;
   const { data: history } = trpc.odds.lineHistory.useQuery(
     { eventId: evId!, market, selection },
     { enabled: evId !== null, refetchInterval: 20000 },
   );
 
   const selections = useMemo(() => {
-    if (market === "moneyline" || market === "spread") return ["home", "away"];
+    if (market === "moneyline")
+      return currentSport === "SOCCER" ? ["home", "draw", "away"] : ["home", "away"];
+    if (market === "spread") return ["home", "away"];
     return ["over", "under"];
-  }, [market]);
+  }, [market, currentSport]);
 
   const points = history ?? [];
   const first = points[0];
@@ -96,15 +105,23 @@ export default function LineMovement() {
         sub="Consensus line history from stored snapshots. Historical odds are never overwritten — every price is auditable."
       />
 
+      <SportFilter
+        value={sport}
+        onChange={(sp) => {
+          setSport(sp);
+          setEventId(null);
+        }}
+      />
+
       <div className="flex flex-wrap gap-3">
         <select
           value={evId ?? ""}
           onChange={(e) => setEventId(Number(e.target.value))}
           className="min-h-[44px] max-w-full rounded-sm border border-border bg-card px-3 font-mono2 text-xs text-foreground"
         >
-          {(events ?? []).map(({ event, home, away }) => (
+          {(events ?? []).map(({ event, home, away, sport: sp }) => (
             <option key={event.id} value={event.id}>
-              {away.abbr} @ {home.abbr} — {fmtTime(event.startTime)}
+              [{sp.code}] {away.abbr} @ {home.abbr} — {fmtTime(event.startTime)}
             </option>
           ))}
         </select>
