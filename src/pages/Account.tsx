@@ -12,12 +12,20 @@ export default function Account() {
       <div className="mx-auto max-w-md pt-10 text-center">
         <p className="label-caps mb-3">Account</p>
         <h2 className="text-2xl font-extrabold">YOU'RE NOT SIGNED IN</h2>
-        <Link
-          to="/login"
-          className="mt-6 inline-block rounded-sm bg-primary px-8 py-3 font-mono2 text-[11px] font-bold tracking-[0.16em] text-primary-foreground"
-        >
-          SIGN IN WITH KIMI
-        </Link>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <Link
+            to="/login"
+            className="rounded-sm bg-primary px-8 py-3 font-mono2 text-[11px] font-bold tracking-[0.16em] text-primary-foreground"
+          >
+            SIGN IN WITH KIMI
+          </Link>
+          <a
+            href="/api/auth/demo-pro"
+            className="rounded-sm border border-[#fbbf24]/50 px-6 py-3 font-mono2 text-[11px] font-bold tracking-[0.14em] text-warn"
+          >
+            PREVIEW PRO — DEMO
+          </a>
+        </div>
       </div>
     );
   }
@@ -51,6 +59,13 @@ export default function Account() {
           <LogOut className="h-3.5 w-3.5" /> SIGN OUT
         </button>
       </div>
+
+      {user.unionId === "demo-pro-preview" && (
+        <div className="rounded-sm border border-[#fbbf24]/40 bg-warn-dim px-4 py-3 font-mono2 text-[11px] leading-relaxed text-warn">
+          DEMO PRO PREVIEW — you are browsing the paid experience with a demo account.
+          No billing involved. Sign out to leave the demo.
+        </div>
+      )}
 
       <div className="panel rounded-sm p-6">
         <p className="label-caps mb-3">Subscription</p>

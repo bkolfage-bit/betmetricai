@@ -1,6 +1,6 @@
 import { SectionHead } from "@/components/bits";
 import { cn } from "@/lib/utils";
-import { Check, Minus } from "lucide-react";
+import { Check, Minus, Sparkles } from "lucide-react";
 
 const FREE = [
   "Limited AI picks (top 3)",
@@ -51,6 +51,28 @@ const PLANS = [
 export default function Premium() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-10">
+      {/* demo pro preview */}
+      <div className="panel flex flex-wrap items-center justify-between gap-4 rounded-sm border-[#fbbf24]/40 p-5">
+        <div className="flex items-start gap-3">
+          <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-warn" />
+          <div>
+            <p className="font-mono2 text-xs font-bold tracking-[0.16em] text-warn">
+              DEMO — TRY THE PAID EXPERIENCE
+            </p>
+            <p className="mt-1 max-w-lg text-xs leading-relaxed text-muted-foreground">
+              Billing is not connected yet. Preview the full PRO terminal with a demo
+              account — no card, no checkout. Sign out anytime to leave the demo.
+            </p>
+          </div>
+        </div>
+        <a
+          href="/api/auth/demo-pro"
+          className="min-h-[44px] rounded-sm bg-[#fbbf24] px-5 py-3 font-mono2 text-[11px] font-bold tracking-[0.14em] text-[#050810] transition-transform hover:scale-[1.02]"
+        >
+          PREVIEW PRO — DEMO ACCESS
+        </a>
+      </div>
+
       <div className="text-center">
         <p className="label-caps mb-3">Premium</p>
         <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
@@ -90,17 +112,26 @@ export default function Premium() {
                 </li>
               ))}
             </ul>
-            <button
-              className={cn(
-                "mt-6 min-h-[44px] rounded-sm font-mono2 text-[11px] font-bold tracking-[0.16em]",
-                p.highlight
-                  ? "bg-primary text-primary-foreground transition-transform hover:scale-[1.02]"
-                  : "border border-border text-muted-foreground",
-              )}
-              disabled={p.name === "FREE"}
-            >
-              {p.cta}
-            </button>
+            {p.name === "FREE" ? (
+              <button
+                className="mt-6 min-h-[44px] rounded-sm border border-border font-mono2 text-[11px] font-bold tracking-[0.16em] text-muted-foreground"
+                disabled
+              >
+                {p.cta}
+              </button>
+            ) : (
+              <a
+                href="/api/auth/demo-pro"
+                className={cn(
+                  "mt-6 flex min-h-[44px] items-center justify-center rounded-sm font-mono2 text-[11px] font-bold tracking-[0.16em]",
+                  p.highlight
+                    ? "bg-primary text-primary-foreground transition-transform hover:scale-[1.02]"
+                    : "border border-border text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {p.cta} — DEMO
+              </a>
+            )}
           </div>
         ))}
       </div>

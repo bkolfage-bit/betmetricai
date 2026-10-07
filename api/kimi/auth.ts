@@ -128,3 +128,40 @@ export function createOAuthCallbackHandler() {
 }
 
 export { exchangeAuthCode, verifyAccessToken };
+
+/**
+ * DEMO PRO PREVIEW — lets visitors experience the paid (PRO) side of the
+ * platform without Stripe. Creates a dedicated demo account with plan=pro
+ * and starts a normal session. This exists only while the platform runs
+ * in DEMO DATA mode; billing is never touched (Stripe stays subscription-
+ * only and is not connected here).
+ */
+export function createDemoProHandler() {
+  return async (c: Context) => {
+    const unionId = "demo-pro-preview";
+    await upsertUser({
+      unionId,
+      name: "Demo Pro",
+      lastSignInAt: new Date(),
+    });
+    // ensure the demo account always has the PRO plan
+    const { getDb } = await import("../queries/connection");
+    const { users } = await import("@db/schema");
+    const { eq } = await import("drizzle-orm");
+    await getDb()
+      .update(users)
+      .set({ plan: "pro" })
+      .where(eq(users.unionId, unionId));
+
+    const token = await signSessionToken({
+      unionId,
+      clientId: env.appId,
+    });
+    const cookieOpts = getSessionCookieOptions(c.req.raw.headers);
+    setCookie(c, Session.cookieName, token, {
+      ...cookieOpts,
+      maxAge: Session.maxAgeMs / 1000,
+    });
+    return c.redirect("/account", 302);
+  };
+}
