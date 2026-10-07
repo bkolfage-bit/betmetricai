@@ -206,6 +206,7 @@ export default function Layout() {
           <div>
             <p className="label-caps mb-3">Platform</p>
             <div className="flex flex-col gap-2 text-xs text-muted-foreground">
+              <Link to="/about" className="hover:text-foreground">About / How It Works</Link>
               <Link to="/picks" className="hover:text-foreground">AI Picks</Link>
               <Link to="/ev" className="hover:text-foreground">+EV Opportunities</Link>
               <Link to="/performance" className="hover:text-foreground">AI Performance</Link>

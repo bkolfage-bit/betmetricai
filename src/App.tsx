@@ -17,6 +17,7 @@ import Premium from "./pages/Premium";
 import Account from "./pages/Account";
 import Admin from "./pages/Admin";
 import Login from "./pages/Login";
+import About from "./pages/About";
 import NotFound from "./pages/NotFound";
 
 export default function App() {
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/tracker" element={<Tracker />} />
         <Route path="/performance" element={<Performance />} />
         <Route path="/premium" element={<Premium />} />
+        <Route path="/about" element={<About />} />
         <Route path="/account" element={<Account />} />
         <Route path="/admin" element={<Admin />} />
       </Route>

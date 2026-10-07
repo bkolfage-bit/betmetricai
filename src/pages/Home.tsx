@@ -98,10 +98,11 @@ export default function Home() {
             WHEN THE <span className="text-primary" style={{ textShadow: "0 0 24px rgba(34,211,238,0.4)" }}>MARKET</span> CHANGES.
           </h1>
           <p className="mt-5 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-            Real-time sportsbook odds, quantitative predictions, AI analysis, +EV
-            opportunities and live betting intelligence. We don't predict winners —
-            we measure the gap between <b className="text-foreground">model probability</b> and
-            the <b className="text-foreground">sportsbook's price</b>, and tell you when the gap is worth betting.
+            Sportsbooks have spent decades pricing markets with sophisticated
+            mathematics. <b className="text-foreground">We believe bettors should have access to
+            powerful analytical tools too.</b> We measure the gap between{" "}
+            <b className="text-foreground">model probability</b> and the{" "}
+            <b className="text-foreground">sportsbook's price</b> — and tell you when the gap is worth betting.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
@@ -162,6 +163,39 @@ export default function Home() {
         </div>
       </section>
 
+      {/* LEVEL THE PLAYING FIELD */}
+      <section className="panel relative overflow-hidden rounded-sm p-8 sm:p-10">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-25"
+          style={{ background: "radial-gradient(700px 240px at 20% 0%, rgba(34,211,238,0.22), transparent 70%)" }}
+        />
+        <p className="label-caps mb-3">Built to level the playing field</p>
+        <h2 className="max-w-3xl text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl">
+          SPORTSBOOK-LEVEL THINKING.
+          <br />
+          BUILT FOR <span className="text-primary">THE OTHER SIDE OF THE BET.</span>
+        </h2>
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Instead of asking "who do I think will win?", our models ask the
+            question at the heart of quantitative sports betting:{" "}
+            <b className="text-foreground">
+              what is the probability of this outcome — and is the sportsbook
+              offering a price that makes the risk worth taking?
+            </b>
+          </p>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Machine learning, Bayesian modeling, Elo ratings, Monte Carlo
+            simulation, no-vig probabilities, line movement and closing-line
+            value — one proprietary platform that evaluates every market from
+            thousands of angles.{" "}
+            <Link to="/about" className="font-mono2 text-[11px] text-primary hover:underline">
+              HOW IT WORKS →
+            </Link>
+          </p>
+        </div>
+      </section>
+
       {/* PIPELINE */}
       <section>
         <SectionHead title="How the machine works" sub="A quantitative pipeline with an AI explanation layer — never the other way around." />
@@ -176,6 +210,37 @@ export default function Home() {
               <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{s.desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* SIMULATION BAND */}
+      <section className="grid gap-px overflow-hidden rounded-sm border border-border bg-border lg:grid-cols-[1fr_1.2fr]">
+        <div className="bg-card p-6 sm:p-8">
+          <p className="label-caps mb-2">Monte Carlo engine</p>
+          <h3 className="text-2xl font-extrabold tracking-tight">10,000 SIMULATIONS. ONE DECISION.</h3>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            Instead of a single predicted score, our models simulate the event
+            thousands of times and measure the full distribution of outcomes.
+            Then we compare that probability against the price in the sportsbook
+            market — that's where prediction becomes{" "}
+            <b className="text-foreground">value analysis</b>.
+          </p>
+        </div>
+        <div className="flex flex-col justify-center gap-3 bg-secondary p-6 font-mono2 text-xs sm:p-8">
+          <p className="label-caps mb-1">Example — 10,000 simulated games</p>
+          {[
+            ["TEAM A WINS", "6,180", "text-pos"],
+            ["TEAM B WINS", "3,820", "text-muted-foreground"],
+            ["ESTIMATED TEAM A WIN PROBABILITY", "61.8%", "text-foreground"],
+          ].map(([k, val, cls]) => (
+            <div key={k} className="flex items-center justify-between border-b border-border/60 pb-2 last:border-0">
+              <span className="text-muted-foreground">{k}</span>
+              <span className={`font-bold tabular-nums ${cls}`}>{val}</span>
+            </div>
+          ))}
+          <div className="mt-1 h-2 overflow-hidden rounded-full bg-border">
+            <div className="h-full w-[61.8%] bg-primary" style={{ boxShadow: "0 0 12px rgba(34,211,238,0.5)" }} />
+          </div>
         </div>
       </section>
 
@@ -208,19 +273,42 @@ export default function Home() {
         </div>
       </section>
 
+      {/* MARKET MOVES + TRANSPARENCY STRIP */}
+      <section className="grid gap-px overflow-hidden rounded-sm border border-border bg-border lg:grid-cols-3">
+        {[
+          {
+            k: "The market moves. So do our models.",
+            v: "A bet that was strong value at -105 may not be value at -140. Every pick is recalculated as odds, lines, injuries, lineups and weather change — and every version is stored.",
+          },
+          {
+            k: "Every sport is different.",
+            v: "One generic AI doesn't predict everything. Football, basketball, baseball, hockey, soccer, tennis, golf and combat sports each run on sport-specific mathematics.",
+          },
+          {
+            k: "Transparency matters.",
+            v: "No guaranteed winners. We track win rate, ROI, units, closing line value and calibration over time — because smart betting is better decisions, repeated.",
+          },
+        ].map((s) => (
+          <div key={s.k} className="bg-card p-6">
+            <p className="font-mono2 text-xs font-bold uppercase tracking-[0.12em] text-primary">{s.k}</p>
+            <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">{s.v}</p>
+          </div>
+        ))}
+      </section>
+
       {/* CTA */}
       <section className="panel relative overflow-hidden rounded-sm p-8 text-center sm:p-12">
         <div
           className="pointer-events-none absolute inset-0 opacity-30"
           style={{ background: "radial-gradient(600px 200px at 50% 0%, rgba(34,211,238,0.25), transparent 70%)" }}
         />
-        <p className="label-caps mb-3">Pro unlocks the full terminal</p>
+        <p className="label-caps mb-3">The house has data. Now you do too.</p>
         <h3 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
           FULL AI EDGE · PLAYER PROPS · LIVE BETTING · AI ASSISTANT
         </h3>
         <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
-          Unlimited picks, full edge scoring, +EV screen, line movement, AI parlay
-          builder, alerts and the advanced bet tracker. $19.99/month or $199/year.
+          Proprietary quantitative models. Real-time sportsbook markets. Advanced
+          AI intelligence. $19.99/month or $199/year.
         </p>
         <Link
           to="/premium"
