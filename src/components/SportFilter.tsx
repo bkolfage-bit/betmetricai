@@ -25,7 +25,7 @@ export function SportFilter() {
           onChange={(e) => setSport(e.target.value === "ALL" ? null : e.target.value)}
           aria-label="Filter the whole site to one sport"
           className={cn(
-            "min-h-[36px] cursor-pointer appearance-none rounded-sm border pl-3 pr-8 font-mono2 text-[11px] font-bold tracking-[0.12em] outline-none transition-colors",
+            "min-h-[36px] max-w-[132px] cursor-pointer appearance-none rounded-sm border pl-2.5 pr-7 font-mono2 text-[10px] font-bold tracking-[0.08em] outline-none transition-colors sm:max-w-none sm:pl-3 sm:pr-8 sm:text-[11px] sm:tracking-[0.12em]",
             sport
               ? "border-[#34d399]/60 bg-pos-dim text-pos"
               : "border-border bg-card text-foreground hover:border-primary/40",

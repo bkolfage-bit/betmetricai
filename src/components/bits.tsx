@@ -164,15 +164,21 @@ export function SectionHead({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-      <div>
-        <h2 className="font-mono2 text-xs font-bold uppercase tracking-[0.22em] text-foreground">
-          <span className="mr-2 inline-block h-2 w-2 bg-primary" />
-          {title}
-        </h2>
-        {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
+    <div className="mb-5 border-b border-border/70 pb-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2.5 text-lg font-extrabold tracking-tight sm:text-xl">
+            <span className="h-4 w-[3px] shrink-0 bg-primary" />
+            {title}
+          </h2>
+          {sub && (
+            <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-muted-foreground">
+              {sub}
+            </p>
+          )}
+        </div>
+        {right && <div className="shrink-0">{right}</div>}
       </div>
-      {right}
     </div>
   );
 }

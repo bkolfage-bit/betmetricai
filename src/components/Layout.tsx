@@ -93,7 +93,7 @@ function Ticker() {
     );
   });
   return (
-    <div className="relative overflow-hidden border-b border-border bg-card/60 py-1.5">
+    <div className="relative overflow-hidden border-t border-border/60 bg-card/60 py-1.5">
       <div className="ticker-track">
         {chips}
         {chips}
@@ -113,9 +113,9 @@ export default function Layout() {
     <div className="flex min-h-screen flex-col">
       {/* header */}
       <header className="sticky top-0 z-50 border-b border-border glass">
-        <div className="mx-auto flex h-14 max-w-[1500px] items-center gap-4 px-3 sm:px-5">
+        <div className="mx-auto flex h-14 max-w-[1500px] items-center gap-2 px-3 sm:gap-4 sm:px-5">
           <Logo />
-          <nav className="hidden flex-1 items-center gap-0.5 overflow-x-auto lg:flex">
+          <nav className="hidden h-14 flex-1 items-stretch gap-0.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] lg:flex [&::-webkit-scrollbar]:hidden">
             {NAV.map((n) => (
               <NavLink
                 key={n.to}
@@ -123,10 +123,10 @@ export default function Layout() {
                 end={n.to === "/"}
                 className={({ isActive }) =>
                   cn(
-                    "whitespace-nowrap px-2.5 py-2 font-mono2 text-[10px] font-semibold tracking-[0.14em] transition-colors",
+                    "flex items-center whitespace-nowrap border-b-2 px-2.5 font-mono2 text-[10px] font-semibold tracking-[0.14em] transition-colors",
                     isActive
-                      ? "text-primary"
-                      : "text-muted-foreground hover:text-foreground",
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground",
                   )
                 }
               >
@@ -134,9 +134,11 @@ export default function Layout() {
               </NavLink>
             ))}
           </nav>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
             <SportFilter />
-            <DemoBadge />
+            <span className="hidden sm:inline-flex">
+              <DemoBadge />
+            </span>
             {!isLoading &&
               (user ? (
                 <Link
@@ -150,28 +152,35 @@ export default function Layout() {
               ) : (
                 <Link
                   to="/login"
-                  className="rounded-sm bg-primary px-3 py-1.5 font-mono2 text-[10px] font-bold tracking-[0.14em] text-primary-foreground transition-transform hover:scale-[1.03]"
+                  className="rounded-sm bg-primary px-2.5 py-1.5 font-mono2 text-[10px] font-bold tracking-[0.1em] text-primary-foreground transition-transform hover:scale-[1.03] sm:px-3 sm:tracking-[0.14em]"
                 >
                   SIGN IN
                 </Link>
               ))}
           </div>
         </div>
-        <Ticker />
       </header>
 
-      {/* freshness strip */}
+      {/* meta strip: freshness (always) + ticker (desktop only) */}
       <div className="border-b border-border/60 bg-background/60">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between px-3 py-1 sm:px-5">
           <Freshness at={fresh?.lastOddsAt ?? null} live={location.pathname === "/live"} />
-          <span className="font-mono2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
-            11 SPORTS · QUANT ENSEMBLES
+          <span className="flex items-center gap-3">
+            <span className="sm:hidden">
+              <DemoBadge />
+            </span>
+            <span className="hidden font-mono2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground sm:inline">
+              11 SPORTS · QUANT ENSEMBLES
+            </span>
           </span>
+        </div>
+        <div className="hidden lg:block">
+          <Ticker />
         </div>
       </div>
 
       {/* content */}
-      <main className="mx-auto w-full max-w-[1500px] flex-1 px-3 pb-24 pt-6 sm:px-5 lg:pb-10">
+      <main className="mx-auto w-full max-w-[1500px] flex-1 px-3 pb-24 pt-7 sm:px-5 lg:pb-12">
         <Outlet />
       </main>
 
