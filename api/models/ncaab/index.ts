@@ -35,11 +35,14 @@ export const ncaabModel: SportModel = {
     awayScoreRate: 70,
   },
   pickMarkets: ["moneyline", "spread", "total"],
+  defaultRatings: { elo: 1500, adjO: 105, adjD: 105, tempo: 67 },
 
   predict(h: Ratings, a: Ratings, ctx: PredictContext): ModelOutput {
     const poss = (h.tempo + a.tempo) / 2 * 0.85 + LEAGUE_TEMPO * 0.15;
-    const ptsH = ((h.adjO + (LEAGUE_EFF - a.adjD)) / 2 / 100) * poss + (ctx.neutral ? 0 : 3.4);
-    const ptsA = ((a.adjO + (LEAGUE_EFF - h.adjD)) / 2 / 100) * poss;
+    // adjusted offensive rating (per 100 poss) × possessions = expected points;
+    // a stray /2 used to halve this, dragging totals ~35 points below reality
+    const ptsH = ((h.adjO + (LEAGUE_EFF - a.adjD)) / 100) * poss + (ctx.neutral ? 0 : 3.4);
+    const ptsA = ((a.adjO + (LEAGUE_EFF - h.adjD)) / 100) * poss;
     const effSp = ptsH - ptsA;
     const bayesSp = (h.elo - a.elo) / 30 + (ctx.neutral ? 0 : 3.2);
 

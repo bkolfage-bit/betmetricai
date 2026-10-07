@@ -387,6 +387,8 @@ export const teamRatings = mysqlTable("team_ratings", {
     .references(() => teams.id),
   featureVersion: varchar("featureVersion", { length: 32 }).notNull(),
   ratings: text("ratings").notNull(), // JSON — sport-specific feature set
+  /** 1 = hand-calibrated/seeded rating; 0 = auto-persisted league prior */
+  isCalibrated: int("isCalibrated").notNull().default(0),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 

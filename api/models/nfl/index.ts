@@ -19,13 +19,15 @@ function eloSpread(h: Ratings, a: Ratings, neutral: boolean): number {
 }
 
 function effSpread(h: Ratings, a: Ratings, neutral: boolean): number {
-  const off = (h.offEff - a.defEff) * 0.55;
-  const def = (a.offEff - h.defEff) * -0.55;
-  return off - def + (neutral ? 0 : 1.6);
+  const off = (h.offEff - a.defEff) * 0.55; // home scoring edge
+  const def = (a.offEff - h.defEff) * -0.55; // away scoring edge, already negated
+  // home margin = home edge + negated away edge — adding, not subtracting
+  // (subtracting here double-counted the away offense toward the home side)
+  return off + def + (neutral ? 0 : 1.6);
 }
 
 function projectedTotal(h: Ratings, a: Ratings, weather?: string | null): number {
-  let t = 44 + (h.offEff + a.offEff) * 0.55 - (h.defEff + a.defEff) * 0.3;
+  let t = 42.5 + (h.offEff + a.offEff) * 0.55 - (h.defEff + a.defEff) * 0.3;
   if (weather && (/wind 1[4-9]|snow|heavy rain/i.test(weather))) t -= 2.5;
   if (weather && /dome|roof/i.test(weather)) t += 0.8;
   return t;
@@ -52,6 +54,7 @@ export const nflModel: SportModel = {
     awayScoreRate: 22,
   },
   pickMarkets: ["moneyline", "spread", "total"],
+  defaultRatings: { elo: 1500, offEff: 0, defEff: 0 },
 
   predict(h: Ratings, a: Ratings, ctx: PredictContext): ModelOutput {
     const neutral = !!ctx.neutral;

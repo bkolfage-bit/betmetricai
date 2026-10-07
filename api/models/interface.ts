@@ -57,5 +57,11 @@ export interface SportModel {
   live: LiveConfig;
   /** markets this sport generates picks on */
   pickMarkets: Array<"moneyline" | "spread" | "total">;
+  /**
+   * True league-average constants for this sport (definitional, e.g. NFL
+   * offEff = 0 for an average team). Used as the floor for missing rating
+   * keys and to regress priors for unrated teams toward the league mean.
+   */
+  defaultRatings: Ratings;
   predict(home: Ratings, away: Ratings, ctx: PredictContext): ModelOutput;
 }

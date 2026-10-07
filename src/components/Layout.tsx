@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
@@ -7,13 +8,24 @@ import { SportFilter } from "@/components/SportFilter";
 import { useSportFilter } from "@/providers/sport-filter";
 import { fmtLine, fmtOdds } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   Activity,
+  BarChart3,
+  Bot,
   CircleUser,
   Crosshair,
+  Dices,
   Home,
+  Info,
+  LayoutGrid,
+  LogIn,
   Radio,
   Shield,
+  Sparkles,
+  Target,
+  TrendingUp,
+  Trophy,
   Wallet,
 } from "lucide-react";
 
@@ -38,8 +50,40 @@ const MOBILE_NAV = [
   { to: "/live", label: "LIVE", icon: Radio },
   { to: "/ev", label: "+EV", icon: Activity },
   { to: "/tracker", label: "TRACKER", icon: Wallet },
-  { to: "/account", label: "ACCOUNT", icon: CircleUser },
-];
+] as const;
+
+/** Everything beyond the bottom bar — surfaced through the mobile MENU sheet. */
+const MOBILE_MENU_SECTIONS = [
+  {
+    title: "CORE",
+    items: [
+      { to: "/", label: "Home", icon: Home, pro: false },
+      { to: "/picks", label: "AI Picks", icon: Crosshair, pro: false },
+      { to: "/live", label: "Live Scores & Odds", icon: Radio, pro: false },
+      { to: "/ev", label: "+EV Opportunities", icon: Activity, pro: false },
+      { to: "/sports", label: "Sports & Models", icon: Trophy, pro: false },
+    ],
+  },
+  {
+    title: "PRO FEATURES",
+    items: [
+      { to: "/props", label: "Player Props", icon: Target, pro: true },
+      { to: "/parlays", label: "AI Parlay Builder", icon: Dices, pro: true },
+      { to: "/line-movement", label: "Line Movement", icon: TrendingUp, pro: true },
+      { to: "/assistant", label: "AI Assistant", icon: Bot, pro: true },
+      { to: "/tracker", label: "Bet Tracker & Bankroll", icon: Wallet, pro: true },
+      { to: "/performance", label: "Performance & CLV", icon: BarChart3, pro: true },
+    ],
+  },
+  {
+    title: "ACCOUNT",
+    items: [
+      { to: "/premium", label: "Go Pro", icon: Sparkles, pro: false },
+      { to: "/account", label: "My Account", icon: CircleUser, pro: false },
+      { to: "/about", label: "About / How It Works", icon: Info, pro: false },
+    ],
+  },
+] as const;
 
 function Logo() {
   return (
@@ -103,6 +147,134 @@ function Ticker() {
         {chips}
       </div>
     </div>
+  );
+}
+
+/** Full-feature mobile menu: every pro feature, auth state, and plan badge. */
+function MobileMenu() {
+  const [open, setOpen] = useState(false);
+  const { user, isLoading } = useAuth();
+  const location = useLocation();
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <button
+          type="button"
+          className="flex min-h-[56px] flex-col items-center justify-center gap-1 font-mono2 text-[8px] tracking-[0.12em] text-muted-foreground"
+          aria-label="Open full menu"
+        >
+          <LayoutGrid size={18} />
+          MENU
+        </button>
+      </SheetTrigger>
+      <SheetContent
+        side="bottom"
+        className="max-h-[85vh] overflow-y-auto rounded-t-lg border-border bg-card px-0 pb-[calc(env(safe-area-inset-bottom)+16px)]"
+      >
+        <SheetTitle className="sr-only">Full menu</SheetTitle>
+        <div className="mx-auto w-full max-w-lg">
+          {/* auth strip — makes sign-in state obvious on mobile */}
+          <div className="border-b border-border/60 px-5 pb-4 pt-1 pr-12">
+            {isLoading ? (
+              <div className="h-12 animate-pulse rounded-sm bg-background/60" />
+            ) : user ? (
+              <Link
+                to="/account"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 rounded-sm border border-border bg-background/50 p-3"
+              >
+                <CircleUser className="h-8 w-8 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{user.name ?? "Account"}</p>
+                  <p className="font-mono2 text-[9px] tracking-[0.16em] text-muted-foreground">
+                    {user.plan === "pro" ? (
+                      <span className="text-warn">PRO PLAN · ALL FEATURES UNLOCKED</span>
+                    ) : (
+                      "FREE PLAN"
+                    )}
+                  </p>
+                </div>
+                {user.role === "admin" && <Shield className="h-4 w-4 text-warn" />}
+                {user.plan !== "pro" && (
+                  <span className="rounded-sm bg-primary px-2 py-1 font-mono2 text-[9px] font-bold tracking-[0.1em] text-primary-foreground">
+                    GO PRO
+                  </span>
+                )}
+              </Link>
+            ) : (
+              <div className="flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">You're not signed in</p>
+                  <p className="truncate font-mono2 text-[9px] tracking-[0.12em] text-muted-foreground">
+                    SIGN IN FOR TRACKER & PRO ACCESS
+                  </p>
+                </div>
+                <Link
+                  to="/login"
+                  onClick={() => setOpen(false)}
+                  className="flex shrink-0 items-center gap-1.5 rounded-sm bg-primary px-3 py-2 font-mono2 text-[10px] font-bold tracking-[0.12em] text-primary-foreground"
+                >
+                  <LogIn className="h-3.5 w-3.5" /> SIGN IN
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* feature sections */}
+          {MOBILE_MENU_SECTIONS.map((sec) => (
+            <div key={sec.title} className="px-5 pt-4">
+              <p className="label-caps mb-2 flex items-center gap-2">
+                {sec.title}
+                {sec.title === "PRO FEATURES" && (
+                  <Sparkles className="h-3 w-3 text-warn" />
+                )}
+              </p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {sec.items.map((item) => {
+                  const Icon = item.icon;
+                  const active =
+                    item.to === "/"
+                      ? location.pathname === "/"
+                      : location.pathname.startsWith(item.to);
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-sm border p-2.5 text-xs transition-colors",
+                        active
+                          ? "border-primary/60 bg-primary/10 text-primary"
+                          : "border-border/70 bg-background/40 text-foreground hover:border-primary/40",
+                      )}
+                    >
+                      <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+                      <span className="min-w-0 flex-1 truncate font-medium">{item.label}</span>
+                      {item.pro && (
+                        <span className="rounded-sm border border-warn/50 px-1 py-px font-mono2 text-[7px] font-bold tracking-[0.1em] text-warn">
+                          PRO
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+                {sec.title === "ACCOUNT" && user?.role === "admin" && (
+                  <Link
+                    to="/admin"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-2.5 rounded-sm border border-border/70 bg-background/40 p-2.5 text-xs text-foreground hover:border-primary/40"
+                  >
+                    <Shield className="h-4 w-4 shrink-0 text-warn" />
+                    <span className="min-w-0 flex-1 truncate font-medium">Admin Console</span>
+                  </Link>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -265,6 +437,7 @@ export default function Layout() {
             </Link>
           );
         })}
+        <MobileMenu />
       </nav>
     </div>
   );

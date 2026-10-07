@@ -31,6 +31,7 @@ import {
   teams,
 } from "../../db/schema";
 import { getSportModel } from "../models";
+import type { SportModel } from "../models/interface";
 import { recomputeEventPicks } from "../engine/recompute";
 import { marketProbability } from "../engine/markets";
 import { americanToDecimal, americanToImplied, noVigN } from "../engine/probability";
@@ -306,54 +307,83 @@ async function ensureTeam(sportId: number, fullName: string): Promise<number> {
  * Ratings for the model, sport-aware. Priority:
  *   1. the team's stored team_ratings JSON for this model's featureVersion
  *      (calibrated values for teams we know)
- *   2. the average of that sport's stored ratings (honest league-average
- *      prior for newly discovered teams — never invented stats)
+ *   2. a shrunk prior for newly discovered teams: the average of the sport's
+ *      stored ratings regressed toward the model's true league-average
+ *      constants (k=4 pseudo-teams). The seeded pool skews elite, so the raw
+ *      average would rate every unknown team like a playoff team.
+ * Every missing key falls back to the model's defaultRatings so a partial
+ * payload can never produce NaN projections.
  */
 async function getModelRatings(
   teamId: number,
   sportId: number,
-  featureVersion: string,
+  model: SportModel,
 ): Promise<Record<string, number>> {
   const db = getDb();
+  const featureVersion = model.featureVersion;
+  const defaults = model.defaultRatings;
   const [own] = await db
     .select()
     .from(teamRatings)
     .where(and(eq(teamRatings.teamId, teamId), eq(teamRatings.featureVersion, featureVersion)))
     .limit(1);
-  if (own) return JSON.parse(own.ratings) as Record<string, number>;
+  if (own) {
+    const j = JSON.parse(own.ratings) as Record<string, number>;
+    return { ...defaults, ...j };
+  }
 
   const sportTeams = await db.select({ id: teams.id }).from(teams).where(eq(teams.sportId, sportId));
   const ids = sportTeams.map((t) => t.id);
   if (ids.length > 0) {
+    // only hand-calibrated rows inform the prior — auto-persisted priors are
+    // excluded so clones can't feed back into the average
     const rows = await db
       .select()
       .from(teamRatings)
-      .where(and(inArray(teamRatings.teamId, ids), eq(teamRatings.featureVersion, featureVersion)));
+      .where(
+        and(
+          inArray(teamRatings.teamId, ids),
+          eq(teamRatings.featureVersion, featureVersion),
+          eq(teamRatings.isCalibrated, 1),
+        ),
+      );
     if (rows.length > 0) {
-      const sum = new Map<string, { s: number; n: number }>();
+      // The calibrated pool is hand-selected (top teams/players), so its mean
+      // is NOT an unbiased estimate of an unknown team — it only informs the
+      // ratings scale. Cap its influence at 25%: prior = (Σ + 3n × league
+      // avg) / 4n. Unknown teams land near true league average, which keeps
+      // the model from manufacturing edges on teams it knows nothing about.
+      const K = rows.length * 3;
+      const acc = new Map<string, { s: number; n: number }>();
       for (const r of rows) {
         const j = JSON.parse(r.ratings) as Record<string, number>;
         for (const [k, v] of Object.entries(j)) {
           if (!Number.isFinite(v)) continue;
-          const acc = sum.get(k) ?? { s: 0, n: 0 };
-          acc.s += v;
-          acc.n++;
-          sum.set(k, acc);
+          const a = acc.get(k) ?? { s: 0, n: 0 };
+          a.s += v;
+          a.n++;
+          acc.set(k, a);
         }
       }
-      const avg: Record<string, number> = {};
-      for (const [k, { s, n }] of sum) avg[k] = Math.round((s / n) * 1000) / 1000;
+      const keys = new Set([...acc.keys(), ...Object.keys(defaults)]);
+      const prior: Record<string, number> = {};
+      for (const k of keys) {
+        const a = acc.get(k) ?? { s: 0, n: 0 };
+        const d = defaults[k] ?? 0;
+        prior[k] = Math.round(((a.s + K * d) / (a.n + K)) * 1000) / 1000;
+      }
       // persist the prior so future syncs are consistent
       await db.insert(teamRatings).values({
         teamId,
         featureVersion,
-        ratings: JSON.stringify(avg),
+        ratings: JSON.stringify(prior),
+        isCalibrated: 0,
       });
-      return avg;
+      return { ...defaults, ...prior };
     }
   }
-  // last resort: neutral base (only for sports with no seeded ratings at all)
-  return { elo: 1500, offEff: 0, defEff: 0 };
+  // last resort: the model's league-average constants
+  return { ...defaults };
 }
 
 async function ensureEvent(ev: ProviderEventOdds, sportId: number): Promise<number> {
@@ -394,16 +424,18 @@ export async function ensurePrediction(eventId: number, sportCode: string): Prom
   try {
     const model = getSportModel(sportCode);
     const [homeRatings, awayRatings] = await Promise.all([
-      getModelRatings(ev.homeTeamId, ev.sportId, model.featureVersion),
-      getModelRatings(ev.awayTeamId, ev.sportId, model.featureVersion),
+      getModelRatings(ev.homeTeamId, ev.sportId, model),
+      getModelRatings(ev.awayTeamId, ev.sportId, model),
     ]);
     const pred = model.predict(homeRatings, awayRatings, {
       weather: ev.weather ?? null,
       injuries: ev.injuries ?? null,
     });
-    // never persist a degenerate model output (NaN / non-finite projections)
+    // never persist a degenerate model output — non-finite projections, or
+    // an exact 0%/100% win probability (no honest pregame model is certain)
     const finite = [pred.projHomeScore, pred.projAwayScore, pred.projSpread, pred.projTotal, pred.homeWinProb].every(Number.isFinite);
     if (!finite) return false;
+    if (pred.homeWinProb <= 0 || pred.homeWinProb >= 1) return false;
     await db.insert(predictions).values({
       eventId,
       modelId: model.modelId,
@@ -441,6 +473,27 @@ export async function ensureEventPicks(eventId: number, sportCode: string): Prom
   if (!pred || !ev) return;
 
   const model = getSportModel(sportCode);
+
+  // Data-quality gate: a published pick is a claim that the model disagrees with
+  // the market for a reason. If EITHER competitor lacks a calibrated rating for
+  // this model version, that side is a league-average prior and the model holds
+  // no real information about them — any "disagreement" with a lopsided market
+  // is then mostly phantom edge manufactured from ignorance (the market prices
+  // in goalies, injuries, form and news that a prior cannot see). Publishing
+  // that would violate the platform's no-fabricated-edge rule, so picks require
+  // BOTH sides calibrated. Prior-based predictions still display on event pages.
+  const calSides = await db
+    .selectDistinct({ teamId: teamRatings.teamId })
+    .from(teamRatings)
+    .where(
+      and(
+        inArray(teamRatings.teamId, [ev.homeTeamId, ev.awayTeamId]),
+        eq(teamRatings.featureVersion, model.featureVersion),
+        eq(teamRatings.isCalibrated, 1),
+      ),
+    );
+  if (calSides.length < 2) return;
+
   const details = pred.details ? (JSON.parse(pred.details) as { dist?: unknown; drawProb?: number }) : {};
   const like = {
     homeWinProb: parseFloat(pred.homeWinProb),

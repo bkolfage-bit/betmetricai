@@ -14,11 +14,16 @@ import type { ModelOutput, PredictContext, Ratings, SportModel } from "../interf
 
 const SURFACE = "hard";
 
-/** P(player wins a point on serve) given serve/return strengths. */
+/**
+ * P(player wins a point on serve) given serve/return strengths.
+ * Anchored so a tour-average server (0.635) vs a tour-average returner
+ * (0.325) wins ~61% of service points → ~76% hold (blended ATP/WTA
+ * baseline, since the feed mixes both tours). Deviation terms let
+ * individual serve/return ratings move the number around the anchor.
+ */
 function pointOnServe(server: Ratings, returner: Ratings): number {
-  const base = server.servePct; // e.g. 0.64
-  const returnEdge = returner.returnPct - 0.36; // vs tour-average return
-  return Math.min(0.85, Math.max(0.45, base - returnEdge * 0.55));
+  const p = 0.61 + (server.servePct - 0.635) - (returner.returnPct - 0.325) * 0.6;
+  return Math.min(0.85, Math.max(0.45, p));
 }
 
 /** P(server holds a game) via standard combinatorial game model. */
@@ -60,14 +65,11 @@ function simulateMatch(pSA: number, pSB: number, sims: number, seed = 42) {
       let gb = 0;
       let serverA = true;
       while (true) {
+        // pWinGame is P(A wins this game) regardless of who serves:
+        // gA = P(A holds own serve), gB = P(A breaks B's serve).
         const pWinGame = serverA ? gA : gB;
-        if (rand() < pWinGame) {
-          if (serverA) ga++;
-          else gb++;
-        } else {
-          if (serverA) gb++;
-          else ga++;
-        }
+        if (rand() < pWinGame) ga++;
+        else gb++;
         serverA = !serverA;
         if ((ga >= 6 || gb >= 6) && Math.abs(ga - gb) >= 2) break;
         if (ga === 7 || gb === 7) break;
@@ -119,9 +121,24 @@ export const tennisModel: SportModel = {
     homeScoreRate: 11,
     awayScoreRate: 10,
   },
-  pickMarkets: ["moneyline", "spread", "total"],
+  // no totals: the sim's absolute game totals run ~1-2 games high vs market
+  // lines and need closing-total calibration data we don't have yet
+  pickMarkets: ["moneyline", "spread"],
 
-  predict(h: Ratings, a: Ratings, _ctx: PredictContext): ModelOutput {
+  defaultRatings: { elo: 1800, hardElo: 1800, servePct: 0.635, returnPct: 0.325, form: 5 },
+
+  predict(h_: Ratings, a_: Ratings, _ctx: PredictContext): ModelOutput {
+    // coerce missing/non-finite keys to tour-average constants — a partial
+    // ratings payload must never NaN the point model
+    const norm = (r: Ratings): Ratings => ({
+      elo: Number.isFinite(r.elo) ? r.elo : 1800,
+      hardElo: Number.isFinite(r.hardElo) ? r.hardElo : Number.isFinite(r.elo) ? r.elo : 1800,
+      servePct: Number.isFinite(r.servePct) ? r.servePct : 0.635,
+      returnPct: Number.isFinite(r.returnPct) ? r.returnPct : 0.325,
+      form: Number.isFinite(r.form) ? r.form : 5,
+    });
+    const h = norm(h_);
+    const a = norm(a_);
     const surfEloH = h[`${SURFACE}Elo`] ?? h.elo;
     const surfEloA = a[`${SURFACE}Elo`] ?? a.elo;
     const eloProb = logistic((surfEloH - surfEloA) / 95);
@@ -141,9 +158,11 @@ export const tennisModel: SportModel = {
     return {
       projHomeScore: Math.round((sim.totalMean + sim.marginMean) / 2 * 10) / 10, // games
       projAwayScore: Math.round((sim.totalMean - sim.marginMean) / 2 * 10) / 10,
-      projSpread: Math.round(sim.marginMean * 2) / 2, // game handicap
-      projTotal: Math.round(sim.totalMean * 2) / 2, // total games
-      homeWinProb: sim.aWinProb,
+      projSpread: Math.round(ens.projSpread * 2) / 2, // blended game handicap
+      projTotal: Math.round(sim.totalMean * 2) / 2, // total games (sim-only output)
+      // blended probability — surface Elo and form carry real signal the
+      // serve/return sim can't see (tour serve stats cluster tightly)
+      homeWinProb: ens.homeWinProb,
       drawProb: 0,
       confidence: 0.58 + ens.agreementFrac * 0.2,
       components: votes,

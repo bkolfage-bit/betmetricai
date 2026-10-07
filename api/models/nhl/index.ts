@@ -42,6 +42,7 @@ export const nhlModel: SportModel = {
     awayScoreRate: 3.0,
   },
   pickMarkets: ["moneyline", "spread", "total"],
+  defaultRatings: { elo: 1500, xgf: 3.05, xga: 3.05, ppPct: 20.5, pkPct: 79.5, goalieGsax: 0 },
 
   predict(h: Ratings, a: Ratings, ctx: PredictContext): ModelOutput {
     const lh = expectedGoals(h, a, !ctx.neutral);

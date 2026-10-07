@@ -34,6 +34,7 @@ export const golfModel: SportModel = {
     awayScoreRate: 70,
   },
   pickMarkets: ["moneyline", "spread"],
+  defaultRatings: { sgTotal: 0, sgOtt: 0, sgApp: 0, sgPutt: 0, courseFit: 0, form: 5 },
 
   predict(h: Ratings, a: Ratings, _ctx: PredictContext): ModelOutput {
     // per-round SG differential, adjusted for course fit, scaled to 72 holes

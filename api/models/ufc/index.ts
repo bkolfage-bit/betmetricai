@@ -48,6 +48,7 @@ export const ufcModel: SportModel = {
     awayScoreRate: 2,
   },
   pickMarkets: ["moneyline", "total"],
+  defaultRatings: { elo: 1500, slpm: 4.5, strAcc: 0.45, strDef: 0.55, tdAcc: 0.4, tdDef: 0.6, subRate: 0.15, finishRate: 0.5, koRate: 0.25, reach: 72, age: 30 },
 
   predict(h: Ratings, a: Ratings, _ctx: PredictContext): ModelOutput {
     const z = winLogit(h, a);

@@ -33,6 +33,7 @@ export const ncaafModel: SportModel = {
     awayScoreRate: 27,
   },
   pickMarkets: ["moneyline", "spread", "total"],
+  defaultRatings: { elo: 1500, offEff: 0, defEff: 0, talent: 5, pace: 67 },
 
   predict(h: Ratings, a: Ratings, ctx: PredictContext): ModelOutput {
     const hfa = ctx.neutral ? 0 : 2.8;

@@ -11,7 +11,7 @@ import { poissonScoreMatrix, normCdf, logistic } from "../../engine/probability"
 import { combine, type ComponentVote } from "../../engine/ensemble";
 import type { ModelOutput, PredictContext, Ratings, SportModel } from "../interface";
 
-const LEAGUE_RUNS = 4.45; // per team per game
+const LEAGUE_RUNS = 4.3; // per team per game (current run environment)
 
 /** Expected runs for a team: lineup vs opposing starter + bullpen, park-adjusted. */
 function expectedRuns(bat: Ratings, pitch: Ratings, home: boolean): number {
@@ -45,6 +45,7 @@ export const mlbModel: SportModel = {
     awayScoreRate: 4.4,
   },
   pickMarkets: ["moneyline", "spread", "total"],
+  defaultRatings: { elo: 1500, woba: 0.31, spEra: 4.2, spWobaAgainst: 0.31, spKpct: 0.224, spBbpct: 0.085, bpWobaAgainst: 0.315, parkFactor: 1 },
 
   predict(h: Ratings, a: Ratings, ctx: PredictContext): ModelOutput {
     const lh = expectedRuns(h, a, !ctx.neutral);

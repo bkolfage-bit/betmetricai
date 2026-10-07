@@ -10,7 +10,7 @@ import { poissonPmf, poissonScoreMatrix, logistic } from "../../engine/probabili
 import { combine, type ComponentVote } from "../../engine/ensemble";
 import type { ModelOutput, PredictContext, Ratings, SportModel } from "../interface";
 
-const LEAGUE_GOALS = 1.42; // per team per match
+const LEAGUE_GOALS = 1.22; // per team per match (current scoring environment)
 const HOME_ADV = 1.32;
 
 function expectedGoals(att: Ratings, def: Ratings, home: boolean): number {
@@ -70,6 +70,7 @@ export const soccerModel: SportModel = {
     awayScoreRate: 1.3,
   },
   pickMarkets: ["moneyline", "spread", "total"],
+  defaultRatings: { elo: 1700, attack: 1, defense: 1, gk: 0, form: 5, fixtureCongestion: 0 },
 
   predict(h: Ratings, a: Ratings, ctx: PredictContext): ModelOutput {
     const lh = expectedGoals(h, a, !ctx.neutral);

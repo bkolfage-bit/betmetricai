@@ -14,7 +14,7 @@ import type { ModelOutput, PredictContext, Ratings, SportModel } from "../interf
 const MARGIN_SD = 12.0;
 const TOTAL_SD = 16.5;
 const LEAGUE_PACE = 100;
-const LEAGUE_ORTG = 114.5;
+const LEAGUE_ORTG = 113.5;
 
 function expPossessions(h: Ratings, a: Ratings): number {
   // pace model: average of the two paces, regressed slightly to league mean
@@ -23,7 +23,7 @@ function expPossessions(h: Ratings, a: Ratings): number {
 
 function expPoints(off: Ratings, def: Ratings, poss: number, home: boolean): number {
   const ortg = off.offRtg * 0.6 + (off.offRtg + (LEAGUE_ORTG - def.defRtg)) * 0.4;
-  return (ortg / 100) * poss + (home ? 2.4 : 0);
+  return (ortg / 100) * poss + (home ? 1.8 : 0);
 }
 
 export const nbaModel: SportModel = {
@@ -47,6 +47,7 @@ export const nbaModel: SportModel = {
     awayScoreRate: 112,
   },
   pickMarkets: ["moneyline", "spread", "total"],
+  defaultRatings: { elo: 1500, offRtg: 113.5, defRtg: 113.5, netRtg: 0, pace: 100, restDays: 1 },
 
   predict(h: Ratings, a: Ratings, ctx: PredictContext): ModelOutput {
     const poss = expPossessions(h, a);
