@@ -1,12 +1,11 @@
-import { useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { SectionHead, Sparkline } from "@/components/bits";
-import { SportFilter } from "@/components/SportFilter";
+import { useSportFilter } from "@/providers/sport-filter";
 import { fmtOdds, fmtTime, num, pct, signedPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export default function Performance() {
-  const [sport, setSport] = useState<string | null>(null);
+  const { sport } = useSportFilter();
   const { data } = trpc.performance.summary.useQuery(sport ? { sport } : undefined);
   if (!data) {
     return <div className="panel animate-pulse rounded-sm p-10 text-center font-mono2 text-xs text-muted-foreground">LOADING AUDIT TRAIL…</div>;
@@ -20,8 +19,6 @@ export default function Performance() {
         title="AI performance — full transparency"
         sub="Every graded pick is auditable. Losing picks are never hidden, records are never restated."
       />
-
-      <SportFilter value={sport} onChange={setSport} />
 
       {/* headline stats */}
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-border bg-border font-mono2 sm:grid-cols-4 lg:grid-cols-8">

@@ -1,12 +1,18 @@
 import { Link } from "react-router";
 import { trpc } from "@/providers/trpc";
+import { useSportFilter } from "@/providers/sport-filter";
 import { EdgeDial, SectionHead, Sparkline, StatusBadge } from "@/components/bits";
 import { PickCard, selectionLabel } from "@/components/PickCard";
 import { fmtLine, fmtOdds, num, pct, signedPct, timeAgo } from "@/lib/format";
 import { ArrowRight, Brain, Database, Gauge, Radio, RefreshCw, Sigma } from "lucide-react";
 
 function BestBetNow() {
-  const { data } = trpc.picks.bestNow.useQuery(undefined, { refetchInterval: 15000 });
+  const { isVisible } = useSportFilter();
+  const { data: list } = trpc.picks.list.useQuery(undefined, { refetchInterval: 15000 });
+  const data =
+    (list ?? [])
+      .filter((r) => r.version && r.version.status !== "PASS" && isVisible(r.sportCode))
+      .sort((a, b) => (b.version?.edgeScore ?? 0) - (a.version?.edgeScore ?? 0))[0] ?? null;
   if (!data?.version) {
     return (
       <div className="panel flex h-full min-h-[320px] items-center justify-center rounded-sm p-6">
@@ -70,9 +76,12 @@ const PIPELINE = [
 ];
 
 export default function Home() {
+  const { isVisible } = useSportFilter();
   const { data: picks } = trpc.picks.list.useQuery(undefined, { refetchInterval: 20000 });
   const { data: perf } = trpc.performance.summary.useQuery();
-  const top = (picks ?? []).filter((p) => p.version && p.version.status !== "PASS").slice(0, 3);
+  const top = (picks ?? [])
+    .filter((p) => p.version && p.version.status !== "PASS" && isVisible(p.sportCode))
+    .slice(0, 3);
   const curve = (perf?.curve ?? []).filter((_, i) => i % 2 === 0).map((c) => c.units);
 
   return (

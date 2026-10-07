@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { PickCard } from "@/components/PickCard";
-import { SportFilter } from "@/components/SportFilter";
+import { useSportFilter } from "@/providers/sport-filter";
 import { EmptyState, SectionHead } from "@/components/bits";
 import { cn } from "@/lib/utils";
 import { STATUS_META, type PickStatus } from "@/lib/format";
@@ -16,7 +16,7 @@ const FILTERS: Array<{ key: PickStatus | "ALL"; label: string }> = [
 ];
 
 export default function Picks() {
-  const [sport, setSport] = useState<string | null>(null);
+  const { sport } = useSportFilter();
   const { data, isLoading } = trpc.picks.list.useQuery(
     sport ? { sport } : undefined,
     { refetchInterval: 15000 },
@@ -43,9 +43,6 @@ export default function Picks() {
         title="AI Picks"
         sub="Every pick is versioned. When the market moves, the engine recalculates — and the full timeline stays visible."
       />
-
-      {/* sport filter rail */}
-      <SportFilter value={sport} onChange={setSport} />
 
       {/* status filter rail */}
       <div className="flex flex-wrap gap-1.5">

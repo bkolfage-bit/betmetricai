@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { EmptyState, SectionHead, StatusBadge } from "@/components/bits";
-import { SportFilter } from "@/components/SportFilter";
+import { useSportFilter } from "@/providers/sport-filter";
 import { cn } from "@/lib/utils";
 import { fmtLine, fmtOdds, num, pct, signedPct, timeAgo } from "@/lib/format";
 
 export default function PlusEV() {
-  const [sport, setSport] = useState<string | null>(null);
+  const { sport } = useSportFilter();
   const { data } = trpc.picks.list.useQuery(sport ? { sport } : undefined, { refetchInterval: 15000 });
   const [minEv, setMinEv] = useState(0);
 
@@ -36,8 +36,6 @@ export default function PlusEV() {
           </label>
         }
       />
-
-      <SportFilter value={sport} onChange={setSport} />
 
       <div className="panel overflow-x-auto rounded-sm">
         <table className="w-full min-w-[760px] border-collapse font-mono2 text-xs">

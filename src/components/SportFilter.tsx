@@ -1,47 +1,54 @@
 import { trpc } from "@/providers/trpc";
+import { useSportFilter } from "@/providers/sport-filter";
 import { cn } from "@/lib/utils";
+import { ChevronDown, X } from "lucide-react";
 
 /**
- * Sport filter rail — shared by Picks, +EV, Line Movement and Performance.
- * `null` = all sports.
+ * Global single-sport selector — the big "VIEWING" control in the header.
+ * Pick a sport and the entire terminal (picks, +EV, live, props, parlays,
+ * line movement, performance, ticker, tracker) shows only that sport.
+ * Persisted in localStorage.
  */
-export function SportFilter({
-  value,
-  onChange,
-}: {
-  value: string | null;
-  onChange: (sport: string | null) => void;
-}) {
+export function SportFilter() {
   const { data } = trpc.models.sports.useQuery();
+  const { sport, setSport } = useSportFilter();
   const codes = (data ?? []).map((s) => s.code);
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <button
-        onClick={() => onChange(null)}
-        className={cn(
-          "rounded-sm border px-2.5 py-1 font-mono2 text-[10px] font-bold tracking-[0.12em] transition-colors",
-          value === null
-            ? "border-[#34d399]/50 bg-pos-dim text-pos"
-            : "border-border text-muted-foreground hover:text-foreground",
-        )}
-      >
-        ALL
-      </button>
-      {codes.map((c) => (
-        <button
-          key={c}
-          onClick={() => onChange(value === c ? null : c)}
+    <div className="flex items-center gap-2">
+      <span className="hidden font-mono2 text-[9px] font-bold tracking-[0.18em] text-muted-foreground sm:inline">
+        VIEWING
+      </span>
+      <div className="relative">
+        <select
+          value={sport ?? "ALL"}
+          onChange={(e) => setSport(e.target.value === "ALL" ? null : e.target.value)}
+          aria-label="Filter the whole site to one sport"
           className={cn(
-            "rounded-sm border px-2.5 py-1 font-mono2 text-[10px] font-bold tracking-[0.12em] transition-colors",
-            value === c
-              ? "border-[#34d399]/50 bg-pos-dim text-pos"
-              : "border-border text-muted-foreground hover:text-foreground",
+            "min-h-[36px] cursor-pointer appearance-none rounded-sm border pl-3 pr-8 font-mono2 text-[11px] font-bold tracking-[0.12em] outline-none transition-colors",
+            sport
+              ? "border-[#34d399]/60 bg-pos-dim text-pos"
+              : "border-border bg-card text-foreground hover:border-primary/40",
           )}
         >
-          {c}
+          <option value="ALL">ALL SPORTS</option>
+          {codes.map((c) => (
+            <option key={c} value={c}>
+              {c} ONLY
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+      </div>
+      {sport && (
+        <button
+          onClick={() => setSport(null)}
+          title="Show all sports"
+          className="flex min-h-[36px] items-center gap-1 rounded-sm border border-border px-2 font-mono2 text-[10px] font-bold tracking-[0.1em] text-muted-foreground transition-colors hover:border-[#34d399]/40 hover:text-pos"
+        >
+          <X className="h-3 w-3" /> CLEAR
         </button>
-      ))}
+      )}
     </div>
   );
 }

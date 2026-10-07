@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { EmptyState, SectionHead } from "@/components/bits";
-import { SportFilter } from "@/components/SportFilter";
+import { useSportFilter } from "@/providers/sport-filter";
 import { fmtLine, fmtOdds, fmtTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -65,7 +65,7 @@ function LineChart({
 
 export default function LineMovement() {
   const { data: allEvents } = trpc.odds.events.useQuery();
-  const [sport, setSport] = useState<string | null>(null);
+  const { sport } = useSportFilter();
   const events = useMemo(
     () => (allEvents ?? []).filter((e) => !sport || e.sport.code === sport),
     [allEvents, sport],
@@ -103,14 +103,6 @@ export default function LineMovement() {
       <SectionHead
         title="Line movement"
         sub="Consensus line history from stored snapshots. Historical odds are never overwritten — every price is auditable."
-      />
-
-      <SportFilter
-        value={sport}
-        onChange={(sp) => {
-          setSport(sp);
-          setEventId(null);
-        }}
       />
 
       <div className="flex flex-wrap gap-3">

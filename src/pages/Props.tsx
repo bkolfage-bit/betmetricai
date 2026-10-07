@@ -1,18 +1,24 @@
 import { useMemo, useState } from "react";
 import { trpc } from "@/providers/trpc";
+import { useSportFilter } from "@/providers/sport-filter";
 import { EmptyState, SectionHead } from "@/components/bits";
 import { cn } from "@/lib/utils";
 import { fmtOdds, num, pct, signedPct, timeAgo } from "@/lib/format";
 
 export default function Props() {
   const { data } = trpc.props.list.useQuery(undefined, { refetchInterval: 20000 });
+  const { isVisible } = useSportFilter();
   const [market, setMarket] = useState("ALL");
 
-  const markets = useMemo(
-    () => ["ALL", ...new Set((data ?? []).map((r) => r.prop.market))],
-    [data],
+  const visible = useMemo(
+    () => (data ?? []).filter((r) => isVisible(r.sportCode)),
+    [data, isVisible],
   );
-  const rows = (data ?? []).filter((r) => market === "ALL" || r.prop.market === market);
+  const markets = useMemo(
+    () => ["ALL", ...new Set(visible.map((r) => r.prop.market))],
+    [visible],
+  );
+  const rows = visible.filter((r) => market === "ALL" || r.prop.market === market);
 
   return (
     <div className="flex flex-col gap-6">
@@ -39,7 +45,7 @@ export default function Props() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {rows.map(({ prop, home, away, book }) => {
+        {rows.map(({ prop, home, away, book, sportCode }) => {
           const probOver = num(prop.probOver);
           const lean = probOver >= 0.5 ? "OVER" : "UNDER";
           const leanProb = Math.max(probOver, 1 - probOver);
@@ -51,7 +57,7 @@ export default function Props() {
                 <div>
                   <p className="font-bold">{prop.player}</p>
                   <p className="font-mono2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                    {prop.teamAbbr} · {prop.market} · {away.abbr}@{home.abbr}
+                    {sportCode} · {prop.teamAbbr} · {prop.market} · {away.abbr}@{home.abbr}
                   </p>
                 </div>
                 <span className={cn("font-mono2 text-lg font-extrabold tabular-nums", strong ? "text-pos" : "text-muted-foreground")}>
