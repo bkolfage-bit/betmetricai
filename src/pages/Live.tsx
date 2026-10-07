@@ -1,5 +1,4 @@
 import { trpc } from "@/providers/trpc";
-import { useSportFilter } from "@/providers/sport-filter";
 import { EmptyState, Freshness, SectionHead, StatusBadge } from "@/components/bits";
 import { PickCard } from "@/components/PickCard";
 import { fmtLine, fmtOdds, num, pct, signedPct } from "@/lib/format";
@@ -10,13 +9,8 @@ export default function Live() {
   const { data: events } = trpc.odds.events.useQuery(undefined, { refetchInterval: 10000 });
   const { data: picks } = trpc.picks.list.useQuery(undefined, { refetchInterval: 10000 });
 
-  const { isVisible } = useSportFilter();
-  const liveEvents = (events ?? []).filter(
-    (e) => e.event.status === "live" && isVisible(e.sport.code),
-  );
-  const livePicks = (picks ?? []).filter(
-    (p) => p.event.status === "live" && isVisible(p.sportCode),
-  );
+  const liveEvents = (events ?? []).filter((e) => e.event.status === "live");
+  const livePicks = (picks ?? []).filter((p) => p.event.status === "live");
 
   return (
     <div className="flex flex-col gap-8">

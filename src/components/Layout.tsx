@@ -2,8 +2,6 @@ import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { DemoBadge, Freshness } from "@/components/bits";
-import { SportFilter } from "@/components/SportFilter";
-import { useSportFilter } from "@/providers/sport-filter";
 import { fmtLine, fmtOdds } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
@@ -69,9 +67,8 @@ function Ticker() {
     refetchInterval: 30000,
     staleTime: 15000,
   });
-  const { isVisible } = useSportFilter();
   const items = (data ?? [])
-    .filter((p) => p.version && p.version.status !== "PASS" && isVisible(p.sportCode))
+    .filter((p) => p.version && p.version.status !== "PASS")
     .slice(0, 10);
   if (items.length === 0) return null;
   const chips = items.map((p) => {
@@ -159,13 +156,13 @@ export default function Layout() {
         <Ticker />
       </header>
 
-      {/* freshness + global sport filter strip */}
+      {/* freshness strip */}
       <div className="border-b border-border/60 bg-background/60">
-        <div className="mx-auto flex max-w-[1500px] items-center gap-4 px-3 py-1.5 sm:px-5">
+        <div className="mx-auto flex max-w-[1500px] items-center justify-between px-3 py-1 sm:px-5">
           <Freshness at={fresh?.lastOddsAt ?? null} live={location.pathname === "/live"} />
-          <div className="min-w-0 flex-1">
-            <SportFilter compact />
-          </div>
+          <span className="font-mono2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+            NFL · model nfl-ensemble-v1.3
+          </span>
         </div>
       </div>
 

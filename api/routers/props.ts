@@ -4,7 +4,6 @@ import {
   alerts,
   events,
   playerProps,
-  sports,
   sportsbooks,
   teams,
 } from "@db/schema";
@@ -24,11 +23,9 @@ export const propsRouter = createRouter({
         home: homeTeams,
         away: awayTeams,
         book: sportsbooks,
-        sportCode: sports.code,
       })
       .from(playerProps)
       .innerJoin(events, eq(playerProps.eventId, events.id))
-      .innerJoin(sports, eq(events.sportId, sports.id))
       .innerJoin(homeTeams, eq(events.homeTeamId, homeTeams.id))
       .innerJoin(awayTeams, eq(events.awayTeamId, awayTeams.id))
       .innerJoin(sportsbooks, eq(playerProps.sportsbookId, sportsbooks.id))

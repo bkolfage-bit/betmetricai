@@ -47,7 +47,6 @@ export const parlaysRouter = createRouter({
       z.object({
         legs: z.number().int().min(2).max(4).default(3),
         targetOdds: z.number().int().nullable().optional(),
-        sports: z.array(z.string()).optional(),
       }),
     )
     .query(async ({ input }) => {
@@ -60,7 +59,7 @@ export const parlaysRouter = createRouter({
       for (const v of versions) {
         if (!latestByPick.has(v.pickId)) latestByPick.set(v.pickId, v);
       }
-      let usable = [...latestByPick.values()].filter(
+      const usable = [...latestByPick.values()].filter(
         (v) =>
           (v.status === "STRONG_BET" ||
             v.status === "BET" ||
@@ -78,29 +77,11 @@ export const parlaysRouter = createRouter({
       const picks = await db.select().from(aiPicks);
       const pickMap = new Map(picks.map((p) => [p.id, p]));
       const evRows = await db
-        .select({ event: events, home: homeTeams, away: awayTeams, sport: sports })
+        .select({ event: events, home: homeTeams, away: awayTeams })
         .from(events)
         .innerJoin(homeTeams, eq(events.homeTeamId, homeTeams.id))
-        .innerJoin(awayTeams, eq(events.awayTeamId, awayTeams.id))
-        .innerJoin(sports, eq(events.sportId, sports.id));
+        .innerJoin(awayTeams, eq(events.awayTeamId, awayTeams.id));
       const evMap = new Map(evRows.map((r) => [r.event.id, r]));
-
-      // respect the user's global sport filter
-      if (input.sports && input.sports.length > 0) {
-        const allowed = new Set(input.sports);
-        usable = usable.filter((v) => {
-          const p = pickMap.get(v.pickId);
-          const ctx = p ? evMap.get(p.eventId) : undefined;
-          return ctx ? allowed.has(ctx.sport.code) : false;
-        });
-        if (usable.length < input.legs) {
-          return {
-            parlay: null,
-            reason:
-              "Not enough +EV positions in your visible sports. Show more sports in the filter rail to widen the parlay pool.",
-          };
-        }
-      }
 
       type Leg = {
         pickId: number;

@@ -33,22 +33,14 @@ function summarize(rows: Array<typeof pickHistory.$inferSelect>) {
 export const performanceRouter = createRouter({
   /** Public, auditable AI performance. Losing picks are never hidden. */
   summary: publicQuery
-    .input(
-      z
-        .object({
-          sport: z.string().optional(),
-          sports: z.array(z.string()).optional(),
-        })
-        .optional(),
-    )
+    .input(z.object({ sport: z.string().optional() }).optional())
     .query(async ({ input }) => {
     const db = getDb();
     const all = await db
       .select()
       .from(pickHistory)
       .orderBy(asc(pickHistory.placedAt));
-    const allow = input?.sports ?? (input?.sport ? [input.sport] : null);
-    const rows = allow ? all.filter((r) => allow.includes(r.sportCode)) : all;
+    const rows = input?.sport ? all.filter((r) => r.sportCode === input.sport) : all;
 
     const overall = summarize(rows);
 

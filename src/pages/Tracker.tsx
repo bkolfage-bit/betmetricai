@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { trpc } from "@/providers/trpc";
-import { useSportFilter } from "@/providers/sport-filter";
 import { useAuth } from "@/hooks/useAuth";
 import { EmptyState, SectionHead } from "@/components/bits";
 import { fmtLine, fmtOdds, fmtTime, num, pct, signedPct } from "@/lib/format";
@@ -90,9 +89,7 @@ function AddBetForm({ onDone }: { onDone: () => void }) {
 
 export default function Tracker() {
   const { user, isLoading } = useAuth();
-  const { isVisible } = useSportFilter();
-  const { data: allBets } = trpc.tracker.list.useQuery(undefined, { enabled: !!user });
-  const bets = (allBets ?? []).filter((b) => isVisible(b.sport));
+  const { data: bets } = trpc.tracker.list.useQuery(undefined, { enabled: !!user });
   const { data: stats } = trpc.tracker.stats.useQuery(undefined, { enabled: !!user });
   const utils = trpc.useUtils();
   const settle = trpc.tracker.settle.useMutation({
