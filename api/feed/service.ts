@@ -14,6 +14,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "../queries/connection";
 import {
   adminConfig,
+  aiPicks,
   currentOdds,
   events,
   feedOddsSnapshots,
@@ -24,10 +25,12 @@ import {
   predictions,
   sports,
   sportsbooks,
+  teamRatings,
   teams,
 } from "../../db/schema";
 import { getSportModel } from "../models";
 import { recomputeEventPicks } from "../engine/recompute";
+import { marketProbability } from "../engine/markets";
 import { americanToDecimal, americanToImplied, noVigN } from "../engine/probability";
 import { getOddsProvider, hasOddsProvider } from "../providers";
 import type { ProviderEventOdds, ProviderSport, QuotaInfo } from "../providers/types";
@@ -257,6 +260,15 @@ async function ensureTeam(sportId: number, fullName: string): Promise<number> {
     .where(and(eq(teams.sportId, sportId), eq(teams.name, fullName)))
     .limit(1);
   if (hit) return hit.id;
+  // provider names are full ("Kansas City Chiefs"); our calibrated teams are
+  // stored as city + name — reuse the calibrated row when it is the same team
+  const sportTeams = await db.select().from(teams).where(eq(teams.sportId, sportId));
+  const matched = sportTeams.find(
+    (t) => t.city && fullName === `${t.city} ${t.name}`,
+  ) ?? sportTeams.find(
+    (t) => t.name.length >= 4 && fullName.endsWith(` ${t.name}`) && t.city && fullName.startsWith(t.city),
+  );
+  if (matched) return matched.id;
   const abbr = fullName
     .split(/\s+/)
     .map((w) => w[0])
@@ -267,6 +279,60 @@ async function ensureTeam(sportId: number, fullName: string): Promise<number> {
     .insert(teams)
     .values({ sportId, name: fullName, abbr: abbr || fullName.slice(0, 3).toUpperCase(), city: "" });
   return Number(r[0].insertId);
+}
+
+/**
+ * Ratings for the model, sport-aware. Priority:
+ *   1. the team's stored team_ratings JSON for this model's featureVersion
+ *      (calibrated values for teams we know)
+ *   2. the average of that sport's stored ratings (honest league-average
+ *      prior for newly discovered teams — never invented stats)
+ */
+async function getModelRatings(
+  teamId: number,
+  sportId: number,
+  featureVersion: string,
+): Promise<Record<string, number>> {
+  const db = getDb();
+  const [own] = await db
+    .select()
+    .from(teamRatings)
+    .where(and(eq(teamRatings.teamId, teamId), eq(teamRatings.featureVersion, featureVersion)))
+    .limit(1);
+  if (own) return JSON.parse(own.ratings) as Record<string, number>;
+
+  const sportTeams = await db.select({ id: teams.id }).from(teams).where(eq(teams.sportId, sportId));
+  const ids = sportTeams.map((t) => t.id);
+  if (ids.length > 0) {
+    const rows = await db
+      .select()
+      .from(teamRatings)
+      .where(and(inArray(teamRatings.teamId, ids), eq(teamRatings.featureVersion, featureVersion)));
+    if (rows.length > 0) {
+      const sum = new Map<string, { s: number; n: number }>();
+      for (const r of rows) {
+        const j = JSON.parse(r.ratings) as Record<string, number>;
+        for (const [k, v] of Object.entries(j)) {
+          if (!Number.isFinite(v)) continue;
+          const acc = sum.get(k) ?? { s: 0, n: 0 };
+          acc.s += v;
+          acc.n++;
+          sum.set(k, acc);
+        }
+      }
+      const avg: Record<string, number> = {};
+      for (const [k, { s, n }] of sum) avg[k] = Math.round((s / n) * 1000) / 1000;
+      // persist the prior so future syncs are consistent
+      await db.insert(teamRatings).values({
+        teamId,
+        featureVersion,
+        ratings: JSON.stringify(avg),
+      });
+      return avg;
+    }
+  }
+  // last resort: neutral base (only for sports with no seeded ratings at all)
+  return { elo: 1500, offEff: 0, defEff: 0 };
 }
 
 async function ensureEvent(ev: ProviderEventOdds, sportId: number): Promise<number> {
@@ -298,24 +364,25 @@ async function ensureEvent(ev: ProviderEventOdds, sportId: number): Promise<numb
  * (new teams carry league-average defaults until calibrated) — the output is
  * the model's own probability, never a manufactured price.
  */
-async function ensurePrediction(eventId: number, sportCode: string): Promise<void> {
+export async function ensurePrediction(eventId: number, sportCode: string): Promise<boolean> {
   const db = getDb();
   const [existing] = await db.select({ id: predictions.id }).from(predictions).where(eq(predictions.eventId, eventId)).limit(1);
-  if (existing) return;
+  if (existing) return true;
   const [ev] = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
-  if (!ev) return;
-  const [[home], [away]] = await Promise.all([
-    db.select().from(teams).where(eq(teams.id, ev.homeTeamId)).limit(1),
-    db.select().from(teams).where(eq(teams.id, ev.awayTeamId)).limit(1),
-  ]);
-  if (!home || !away) return;
+  if (!ev) return false;
   try {
     const model = getSportModel(sportCode);
-    const pred = model.predict(
-      { elo: home.elo, offEff: parseFloat(home.offEff), defEff: parseFloat(home.defEff) },
-      { elo: away.elo, offEff: parseFloat(away.offEff), defEff: parseFloat(away.defEff) },
-      { weather: ev.weather ?? null, injuries: ev.injuries ?? null },
-    );
+    const [homeRatings, awayRatings] = await Promise.all([
+      getModelRatings(ev.homeTeamId, ev.sportId, model.featureVersion),
+      getModelRatings(ev.awayTeamId, ev.sportId, model.featureVersion),
+    ]);
+    const pred = model.predict(homeRatings, awayRatings, {
+      weather: ev.weather ?? null,
+      injuries: ev.injuries ?? null,
+    });
+    // never persist a degenerate model output (NaN / non-finite projections)
+    const finite = [pred.projHomeScore, pred.projAwayScore, pred.projSpread, pred.projTotal, pred.homeWinProb].every(Number.isFinite);
+    if (!finite) return false;
     await db.insert(predictions).values({
       eventId,
       modelId: model.modelId,
@@ -331,8 +398,72 @@ async function ensurePrediction(eventId: number, sportCode: string): Promise<voi
       isLive: false,
       createdAt: new Date(),
     });
+    return true;
   } catch {
     // sport has no registered model — skip prediction, odds still sync
+    return false;
+  }
+}
+
+/**
+ * Create the candidate picks for a real event from the CURRENT market —
+ * same rules as the rest of the platform: one pick per supported market,
+ * on the side the model favors at the consensus (median) line. Versions are
+ * then produced by recomputeEventPicks, which prices them book-by-book.
+ */
+export async function ensureEventPicks(eventId: number, sportCode: string): Promise<void> {
+  const db = getDb();
+  const [existing] = await db.select({ id: aiPicks.id }).from(aiPicks).where(eq(aiPicks.eventId, eventId)).limit(1);
+  if (existing) return;
+  const [pred] = await db.select().from(predictions).where(eq(predictions.eventId, eventId)).orderBy(desc(predictions.id)).limit(1);
+  const [ev] = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
+  if (!pred || !ev) return;
+
+  const model = getSportModel(sportCode);
+  const details = pred.details ? (JSON.parse(pred.details) as { dist?: unknown; drawProb?: number }) : {};
+  const like = {
+    homeWinProb: parseFloat(pred.homeWinProb),
+    drawProb: details.drawProb,
+    dist: details.dist as never,
+  };
+
+  // consensus (median) line per market from the live current_odds
+  const rows = await db
+    .select({ market: currentOdds.market, outcome: currentOdds.outcome, line: currentOdds.line })
+    .from(currentOdds)
+    .where(eq(currentOdds.eventId, eventId));
+  const linesFor = (market: string, outcome: string) =>
+    rows
+      .filter((r) => r.market === market && r.outcome === outcome && r.line !== null)
+      .map((r) => parseFloat(r.line!))
+      .sort((a, b) => a - b);
+  const median = (xs: number[]) => (xs.length === 0 ? null : xs[Math.floor(xs.length / 2)]);
+
+  const creates: Array<{ market: "moneyline" | "spread" | "total"; selection: string }> = [];
+  if (model.pickMarkets.includes("spread")) {
+    const line = median(linesFor("spread", "home"));
+    if (line !== null) {
+      const pHome = marketProbability(like, "spread", "home", line);
+      if (Number.isFinite(pHome)) creates.push({ market: "spread", selection: pHome >= 0.5 ? "home" : "away" });
+    }
+  }
+  if (model.pickMarkets.includes("total")) {
+    const line = median(linesFor("total", "over"));
+    if (line !== null) {
+      const pOver = marketProbability(like, "total", "over", line);
+      if (Number.isFinite(pOver)) creates.push({ market: "total", selection: pOver >= 0.5 ? "over" : "under" });
+    }
+  }
+  const hoursOut = (ev.startTime.getTime() - Date.now()) / 3_600_000;
+  if (model.pickMarkets.includes("moneyline") && (hoursOut < 30 || sportCode === "UFC" || sportCode === "TENNIS")) {
+    const hasMl = rows.some((r) => r.market === "moneyline");
+    if (hasMl) {
+      const hwp = parseFloat(pred.homeWinProb);
+      creates.push({ market: "moneyline", selection: hwp >= (details.drawProb ? 0.34 : 0.5) ? "home" : "away" });
+    }
+  }
+  for (const c of creates) {
+    await db.insert(aiPicks).values({ eventId, market: c.market, selection: c.selection });
   }
 }
 
@@ -568,7 +699,8 @@ export async function syncSportOdds(
 
         /* ---- phase 4: dynamic pick recalculation for moved events ---- */
         for (const eventId of movedEvents) {
-          await ensurePrediction(eventId, sportCode);
+          const ok = await ensurePrediction(eventId, sportCode);
+          if (ok) await ensureEventPicks(eventId, sportCode);
           await recomputeEventPicks(eventId);
         }
       }

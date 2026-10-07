@@ -90,26 +90,32 @@ export const oddsRouter = createRouter({
       }));
     }),
 
-  /** Feed freshness — every live display must show its data age. */
+  /** Feed freshness — every live display must show its data age.
+   *  In LIVE mode the heartbeat is the odds feed itself (last odds activity);
+   *  in DEMO mode it is the simulator tick. */
   freshness: publicQuery.query(async () => {
     const db = getDb();
-    const tick = await db
-      .select()
-      .from(adminConfig)
-      .where(eq(adminConfig.key, "sim_last_tick"));
+    const mode = await getFeedMode();
     const latest = await db
       .select()
       .from(oddsSnapshots)
       .orderBy(desc(oddsSnapshots.capturedAt), desc(oddsSnapshots.id))
       .limit(1);
-    const mode = await db
-      .select()
-      .from(adminConfig)
-      .where(eq(adminConfig.key, "data_mode"));
+    const lastOddsAt = latest[0]?.capturedAt ?? null;
+    let lastTick: string | Date | null = null;
+    if (mode === "live") {
+      lastTick = lastOddsAt;
+    } else {
+      const tick = await db
+        .select()
+        .from(adminConfig)
+        .where(eq(adminConfig.key, "sim_last_tick"));
+      lastTick = tick[0]?.value ?? null;
+    }
     return {
-      dataMode: mode[0]?.value ?? "DEMO",
-      lastTick: tick[0]?.value ?? null,
-      lastOddsAt: latest[0]?.capturedAt ?? null,
+      dataMode: mode === "live" ? "LIVE" : "DEMO",
+      lastTick,
+      lastOddsAt,
       serverTime: new Date(),
     };
   }),
