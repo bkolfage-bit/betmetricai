@@ -1,0 +1,10 @@
+import "dotenv/config";
+import { getDb } from "../api/queries/connection";
+import { sportsbooks } from "./schema";
+import { sql } from "drizzle-orm";
+const db = getDb();
+const rows = await db.select().from(sportsbooks);
+for (const b of rows) console.log(`${String(b.id).padStart(4)} ${b.name.padEnd(22)} key=${b.providerKey ?? "-"} code=${b.code}`);
+const [n] = await db.execute(sql`SELECT sportsbook_id, COUNT(*) c FROM current_odds GROUP BY sportsbook_id ORDER BY c DESC`);
+console.log("\ncurrent_odds per book:", (n as any[]).map(r=>`${r.sportsbook_id}:${r.c}`).join(" "));
+process.exit(0);
