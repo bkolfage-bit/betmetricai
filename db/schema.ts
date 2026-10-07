@@ -78,16 +78,104 @@ export const events = mysqlTable("events", {
   period: varchar("period", { length: 16 }),
   clock: varchar("clock", { length: 16 }),
   isDemo: boolean("isDemo").default(true).notNull(),
+  /* production odds feed identity (null while DEMO-sourced) */
+  provider: varchar("provider", { length: 32 }),
+  providerEventId: varchar("providerEventId", { length: 128 }),
+  oddsSyncedAt: timestamp("oddsSyncedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export const sportsbooks = mysqlTable("sportsbooks", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 64 }).notNull(),
+  providerKey: varchar("providerKey", { length: 64 }),
+  region: varchar("region", { length: 8 }),
+  lastSeenAt: timestamp("lastSeenAt"),
   code: varchar("code", { length: 16 }).notNull().unique(),
   affiliateUrl: text("affiliateUrl"),
   priority: int("priority").default(0).notNull(),
   active: boolean("active").default(true).notNull(),
+});
+
+/* ------------------------- production odds feed -------------------------- */
+
+/** Provider sport-key mapping — populated by live discovery, never assumed. */
+export const oddsSportMap = mysqlTable("odds_sport_map", {
+  id: serial("id").primaryKey(),
+  sportCode: varchar("sport_code", { length: 32 }).notNull(),
+  providerSportKey: varchar("provider_sport_key", { length: 128 }).notNull(),
+  providerTitle: varchar("provider_title", { length: 255 }),
+  providerGroup: varchar("provider_group", { length: 64 }),
+  hasOutrights: boolean("has_outrights").default(false).notNull(),
+  status: mysqlEnum("status", ["active", "outrights_only", "unavailable"])
+    .default("active")
+    .notNull(),
+  lastCheckedAt: timestamp("last_checked_at"),
+});
+
+/** Current odds — one row per event/book/market/outcome, fast frontend read. */
+export const currentOdds = mysqlTable("current_odds", {
+  id: serial("id").primaryKey(),
+  eventId: bigint("event_id", { mode: "number", unsigned: true }).notNull(),
+  sportsbookId: bigint("sportsbook_id", { mode: "number", unsigned: true }).notNull(),
+  market: mysqlEnum("market", ["moneyline", "spread", "total", "prop"]).notNull(),
+  outcome: varchar("outcome", { length: 64 }).notNull(),
+  line: decimal("line", { precision: 8, scale: 2 }),
+  americanOdds: int("american_odds").notNull(),
+  decimalOdds: decimal("decimal_odds", { precision: 10, scale: 4 }).notNull(),
+  impliedProb: decimal("implied_prob", { precision: 8, scale: 6 }).notNull(),
+  noVigProb: decimal("no_vig_prob", { precision: 8, scale: 6 }),
+  providerLastUpdate: timestamp("provider_last_update").notNull(),
+  fetchedAt: timestamp("fetched_at").notNull(),
+  isLive: boolean("is_live").default(false).notNull(),
+});
+
+/** Feed snapshot history — append-only, deduped by provider_last_update. */
+export const feedOddsSnapshots = mysqlTable("feed_odds_snapshots", {
+  id: serial("id").primaryKey(),
+  eventId: bigint("event_id", { mode: "number", unsigned: true }).notNull(),
+  sportsbookId: bigint("sportsbook_id", { mode: "number", unsigned: true }).notNull(),
+  market: mysqlEnum("market", ["moneyline", "spread", "total", "prop"]).notNull(),
+  outcome: varchar("outcome", { length: 64 }).notNull(),
+  line: decimal("line", { precision: 8, scale: 2 }),
+  americanOdds: int("american_odds").notNull(),
+  decimalOdds: decimal("decimal_odds", { precision: 10, scale: 4 }).notNull(),
+  impliedProb: decimal("implied_prob", { precision: 8, scale: 6 }).notNull(),
+  noVigProb: decimal("no_vig_prob", { precision: 8, scale: 6 }),
+  providerLastUpdate: timestamp("provider_last_update").notNull(),
+  fetchedAt: timestamp("fetched_at").notNull(),
+  isLive: boolean("is_live").default(false).notNull(),
+});
+
+/** Quota tracking straight from provider response headers. */
+export const oddsApiUsage = mysqlTable("odds_api_usage", {
+  id: serial("id").primaryKey(),
+  endpoint: varchar("endpoint", { length: 255 }).notNull(),
+  sportKey: varchar("sport_key", { length: 128 }),
+  cost: int("cost").default(1).notNull(),
+  requestsUsed: int("requests_used"),
+  requestsRemaining: int("requests_remaining"),
+  latencyMs: int("latency_ms"),
+  status: varchar("status", { length: 16 }).default("ok").notNull(),
+  message: varchar("message", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/** Feed health per sport. */
+export const oddsFeedHealth = mysqlTable("odds_feed_health", {
+  id: serial("id").primaryKey(),
+  sportCode: varchar("sport_code", { length: 32 }).notNull().unique(),
+  status: mysqlEnum("status", ["healthy", "warning", "degraded", "offline", "unavailable"])
+    .default("offline")
+    .notNull(),
+  lastSuccessAt: timestamp("last_success_at"),
+  lastFailureAt: timestamp("last_failure_at"),
+  consecutiveFailures: int("consecutive_failures").default(0).notNull(),
+  message: varchar("message", { length: 255 }),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
 });
 
 /* ------------------------------ odds & model ----------------------------- */

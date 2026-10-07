@@ -26,6 +26,7 @@ import { and, eq, lt } from "drizzle-orm";
 import { normCdf, probToAmerican } from "../engine/probability";
 import { poissonPmf } from "../engine/probability";
 import { recomputeEventPicks } from "../engine/recompute";
+import { getFeedMode } from "../feed/service";
 import { SPORT_MODELS } from "../models";
 import type { LiveConfig } from "../models/interface";
 
@@ -496,6 +497,10 @@ export function startSimulator() {
   started = true;
   const tick = async () => {
     try {
+      // When the production feed is LIVE, real odds own the pipeline —
+      // the DEMO simulator stands down so the two never mix.
+      const mode = await getFeedMode().catch(() => "demo" as const);
+      if (mode === "live") return;
       await heartbeat();
       await promoteEvents();
       await advanceLiveGames();

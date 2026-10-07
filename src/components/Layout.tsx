@@ -1,7 +1,8 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
-import { DemoBadge, Freshness } from "@/components/bits";
+import { DataSourceBadge, Freshness } from "@/components/bits";
+import { useFeedStatus } from "@/hooks/use-feed-status";
 import { SportFilter } from "@/components/SportFilter";
 import { useSportFilter } from "@/providers/sport-filter";
 import { fmtLine, fmtOdds } from "@/lib/format";
@@ -108,6 +109,10 @@ export default function Layout() {
   const { data: fresh } = trpc.odds.freshness.useQuery(undefined, {
     refetchInterval: 15000,
   });
+  const feed = useFeedStatus();
+  const feedDegraded =
+    feed.mode === "live" &&
+    feed.health.some((h) => h.status === "degraded" || h.status === "offline");
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -137,7 +142,7 @@ export default function Layout() {
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
             <SportFilter />
             <span className="hidden sm:inline-flex">
-              <DemoBadge />
+              <DataSourceBadge mode={feed.mode} degraded={feedDegraded} />
             </span>
             {!isLoading &&
               (user ? (
@@ -167,7 +172,7 @@ export default function Layout() {
           <Freshness at={fresh?.lastOddsAt ?? null} live={location.pathname === "/live"} />
           <span className="flex items-center gap-3">
             <span className="sm:hidden">
-              <DemoBadge />
+              <DataSourceBadge mode={feed.mode} degraded={feedDegraded} />
             </span>
             <span className="hidden font-mono2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground sm:inline">
               11 SPORTS · QUANT ENSEMBLES
@@ -227,7 +232,9 @@ export default function Layout() {
         </div>
         <div className="hairline-t mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-2 px-5 py-4">
           <p className="font-mono2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
-            © 2026 BetMetricAi · All displayed data is simulated DEMO DATA through the live pipeline
+            © 2026 BetMetricAi · {feed.mode === "live"
+              ? "Odds: The Odds API (production feed) · Predictions: quantitative models"
+              : "All displayed data is simulated DEMO DATA through the live pipeline"}
           </p>
           <p className="font-mono2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
             Prediction ≠ betting value

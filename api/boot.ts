@@ -9,6 +9,8 @@ import { createOAuthCallbackHandler, createDemoProHandler } from "./kimi/auth";
 import { Paths } from "@contracts/constants";
 import { handleAssistantChat } from "./assistant";
 import { startSimulator } from "./lib/sim";
+import { startFeedScheduler } from "./feed/scheduler";
+import { feedStreamHandler } from "./feed/stream";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -17,6 +19,8 @@ app.get(Paths.oauthCallback, createOAuthCallbackHandler());
 // DEMO: preview the paid (PRO) experience without billing
 app.get("/api/auth/demo-pro", createDemoProHandler());
 app.post("/api/ai/chat", async (c) => handleAssistantChat(c.req.raw));
+// realtime odds-feed status (SSE)
+app.get("/api/feed/stream", (c) => feedStreamHandler(c));
 app.use("/api/trpc/*", async (c) => {
   return fetchRequestHandler({
     endpoint: "/api/trpc",
@@ -40,5 +44,7 @@ if (env.isProduction) {
   });
 }
 
-// DEMO DATA market simulator — replaced by licensed feeds in production
+// DEMO DATA market simulator — stands down automatically when the feed is LIVE
 startSimulator();
+// Production odds feed — adaptive polling, gated by LIVE mode + quota tiers
+startFeedScheduler();

@@ -201,6 +201,146 @@ function ModelRegistry() {
   );
 }
 
+/* ----------------------- production odds feed panel ---------------------- */
+
+const HEALTH_STYLE: Record<string, string> = {
+  healthy: "border-[#34d399]/40 text-pos",
+  warning: "border-[#fbbf24]/40 text-warn",
+  degraded: "border-[#f87171]/40 text-neg",
+  offline: "border-[#f87171]/40 text-neg",
+  unavailable: "border-border text-muted-foreground",
+};
+
+function FeedDashboard() {
+  const utils = trpc.useUtils();
+  const { data, refetch } = trpc.feed.dashboard.useQuery(undefined, {
+    refetchInterval: 30000,
+  });
+  const discover = trpc.feed.discover.useMutation({ onSuccess: () => refetch() });
+  const syncSport = trpc.feed.syncSport.useMutation({
+    onSuccess: () => {
+      refetch();
+      utils.invalidate();
+    },
+  });
+  const setMode = trpc.feed.setMode.useMutation({ onSuccess: () => refetch() });
+  if (!data) return null;
+
+  const q = data.quota;
+  const activeSports = [...new Set(
+    data.sportMap.filter((m) => m.status === "active").map((m) => m.sportCode),
+  )];
+
+  return (
+    <section className="panel overflow-hidden rounded-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <p className="label-caps">Production odds feed — The Odds API v4</p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => discover.mutate()}
+            disabled={discover.isPending}
+            className="rounded-sm border border-border px-2.5 py-1 font-mono2 text-[9px] font-bold tracking-[0.12em] text-foreground hover:border-primary/50 disabled:opacity-40"
+          >
+            {discover.isPending ? "DISCOVERING…" : "RUN DISCOVERY (FREE)"}
+          </button>
+          <button
+            onClick={() => setMode.mutate({ mode: data.mode === "live" ? "demo" : "live" })}
+            disabled={setMode.isPending || !data.providerConfigured}
+            className={cn(
+              "rounded-sm border px-2.5 py-1 font-mono2 text-[9px] font-bold tracking-[0.12em] disabled:opacity-40",
+              data.mode === "live"
+                ? "border-[#34d399]/50 bg-pos-dim text-pos"
+                : "border-[#fbbf24]/50 bg-warn-dim text-warn",
+            )}
+          >
+            MODE: {data.mode === "live" ? "LIVE FEED" : "DEMO SIMULATOR"} — SWITCH
+          </button>
+        </div>
+      </div>
+
+      {/* quota cards */}
+      <div className="grid grid-cols-2 gap-px border-b border-border bg-border font-mono2 sm:grid-cols-5">
+        {[
+          ["CREDITS USED", q.used != null ? `${q.used}` : "—"],
+          ["CREDITS REMAINING", q.remaining != null ? `${q.remaining}` : "—"],
+          ["MONTHLY BASELINE", q.baseline != null ? `${q.baseline}` : "—"],
+          ["QUOTA TIER", q.tier.toUpperCase()],
+          ["PROVIDER KEY", data.providerConfigured ? "CONFIGURED · SERVER-ONLY" : "MISSING"],
+        ].map(([k, v]) => (
+          <div key={k} className="bg-card px-4 py-3">
+            <p className="label-caps" style={{ fontSize: 8 }}>{k}</p>
+            <p className="mt-1 text-sm font-bold tabular-nums">{v}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* per-sport health + manual sync */}
+      <div className="divide-y divide-border">
+        {data.health.length === 0 && (
+          <p className="px-4 py-4 font-mono2 text-[10px] text-muted-foreground">
+            No feed state yet — run discovery, then sync a sport.
+          </p>
+        )}
+        {data.health.map((h) => (
+          <div key={h.sportCode} className="flex flex-wrap items-center gap-3 px-4 py-2.5 font-mono2 text-[10px]">
+            <span className="w-24 font-bold">{h.sportCode}</span>
+            <span className={cn("rounded-sm border px-2 py-0.5 text-[9px] font-bold uppercase", HEALTH_STYLE[h.status])}>
+              {h.status}
+            </span>
+            <span className="text-muted-foreground">
+              {h.lastSuccessAt ? `last ok ${timeAgo(h.lastSuccessAt)}` : "never synced"}
+              {h.consecutiveFailures > 0 ? ` · ${h.consecutiveFailures} failures` : ""}
+            </span>
+            <span className="flex-1 truncate text-muted-foreground/70">{h.message}</span>
+            {activeSports.includes(h.sportCode) && (
+              <button
+                onClick={() => syncSport.mutate({ sportCode: h.sportCode })}
+                disabled={syncSport.isPending}
+                className="rounded-sm border border-border px-2 py-0.5 text-[9px] font-bold hover:border-primary/50 disabled:opacity-40"
+              >
+                SYNC NOW
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* discovered provider keys */}
+      <div className="border-t border-border px-4 py-3">
+        <p className="label-caps mb-2" style={{ fontSize: 8 }}>Discovered provider sport keys</p>
+        <div className="flex flex-wrap gap-1.5">
+          {data.sportMap.map((m) => (
+            <span
+              key={`${m.sportCode}:${m.providerSportKey}`}
+              className="rounded-sm border border-border px-1.5 py-0.5 font-mono2 text-[9px] text-muted-foreground"
+            >
+              {m.sportCode} → {m.providerSportKey}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* recent provider calls */}
+      <div className="border-t border-border px-4 py-3">
+        <p className="label-caps mb-2" style={{ fontSize: 8 }}>Recent provider calls (cost in credits)</p>
+        <div className="space-y-1 font-mono2 text-[10px]">
+          {data.lastCalls.slice(0, 8).map((c) => (
+            <div key={c.id} className="flex items-center gap-3">
+              <span className={cn("w-10 font-bold", c.status === "ok" ? "text-pos" : "text-neg")}>
+                {c.status.toUpperCase()}
+              </span>
+              <span className="flex-1 truncate text-muted-foreground">{c.endpoint}</span>
+              <span className="tabular-nums">cost {c.cost}</span>
+              <span className="tabular-nums text-muted-foreground">left {c.requestsRemaining ?? "—"}</span>
+              <span className="text-muted-foreground">{timeAgo(c.createdAt)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function Admin() {
   const { user, isLoading } = useAuth();
   const { data, refetch } = trpc.admin.stats.useQuery(undefined, {
@@ -244,6 +384,8 @@ export default function Admin() {
         title="Admin console"
         sub="Platform health, model controls and sportsbook management — no source-code changes required."
       />
+
+      <FeedDashboard />
 
       {/* health cards */}
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-border bg-border font-mono2 sm:grid-cols-4">

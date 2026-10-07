@@ -121,6 +121,35 @@ export function DemoBadge() {
   );
 }
 
+/**
+ * Data-source badge — the honest label for where odds come from.
+ *  - DEMO mode: amber DEMO DATA (simulator)
+ *  - LIVE mode + healthy feed: green LIVE ODDS
+ *  - LIVE mode + feed trouble: red LIVE ODDS TEMPORARILY UNAVAILABLE
+ */
+export function DataSourceBadge({
+  mode,
+  degraded,
+}: {
+  mode: "demo" | "live";
+  degraded?: boolean;
+}) {
+  if (mode === "demo") return <DemoBadge />;
+  if (degraded) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-sm border border-[#f87171]/40 bg-neg-dim px-2 py-0.5 font-mono2 text-[9px] font-bold uppercase tracking-[0.18em] text-neg">
+        Live odds temporarily unavailable
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-sm border border-[#34d399]/40 bg-pos-dim px-2 py-0.5 font-mono2 text-[9px] font-bold uppercase tracking-[0.18em] text-pos">
+      <span className="led led-live" />
+      Live odds
+    </span>
+  );
+}
+
 export function Sparkline({
   points,
   width = 120,
