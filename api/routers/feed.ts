@@ -5,7 +5,10 @@
  *  - admin: discovery, manual sync, mode switch (DEMO <-> LIVE), quota detail
  */
 import { z } from "zod";
+import { asc, desc, eq } from "drizzle-orm";
 import { adminQuery, createRouter, publicQuery } from "../middleware";
+import { getDb } from "../queries/connection";
+import { oddsOutrights, sportsbooks } from "@db/schema";
 import {
   allowedPropMarkets,
   discoverSports,
@@ -14,6 +17,7 @@ import {
   getFeedStatus,
   setFeedMode,
   syncEventProps,
+  syncOutrights,
   syncSportOdds,
 } from "../feed/service";
 import { hasOddsProvider } from "../providers";
@@ -33,6 +37,58 @@ export const feedRouter = createRouter({
       })),
     };
   }),
+
+  /**
+   * Public: championship / futures boards (the horizon exception).
+   * Grouped per provider key (e.g. Super Bowl winner, World Series winner),
+   * each participant with its best price across books.
+   */
+  outrights: publicQuery
+    .input(z.object({ sportCode: z.string().min(2).max(16).optional() }).optional())
+    .query(async ({ input }) => {
+      const db = getDb();
+      const rows = await db
+        .select()
+        .from(oddsOutrights)
+        .orderBy(asc(oddsOutrights.sportCode), asc(oddsOutrights.providerSportKey), asc(oddsOutrights.participant));
+      const filtered = input?.sportCode
+        ? rows.filter((r) => r.sportCode === input.sportCode.toUpperCase())
+        : rows;
+      const books = await db.select().from(sportsbooks);
+      const bookName = new Map(books.map((b) => [b.id, b.name]));
+
+      const boards = new Map<string, {
+        sportCode: string;
+        providerSportKey: string;
+        lastUpdate: Date | null;
+        participants: Map<string, { participant: string; bestOdds: number; bestBook: string; books: number }>;
+      }>();
+      for (const r of filtered) {
+        const key = `${r.sportCode}:${r.providerSportKey}`;
+        const b = boards.get(key) ?? {
+          sportCode: r.sportCode,
+          providerSportKey: r.providerSportKey,
+          lastUpdate: null,
+          participants: new Map(),
+        };
+        const p = b.participants.get(r.participant) ?? {
+          participant: r.participant, bestOdds: -Infinity, bestBook: "", books: 0,
+        };
+        p.books++;
+        if (r.americanOdds > p.bestOdds) {
+          p.bestOdds = r.americanOdds;
+          p.bestBook = bookName.get(r.sportsbookId) ?? "";
+        }
+        b.participants.set(r.participant, p);
+        if (!b.lastUpdate || r.providerLastUpdate > b.lastUpdate) b.lastUpdate = r.providerLastUpdate;
+        boards.set(key, b);
+      }
+      return [...boards.values()].map((b) => ({
+        ...b,
+        participants: [...b.participants.values()].sort((x, y) => y.bestOdds - x.bestOdds)
+          .sort((x, y) => Math.abs(y.bestOdds) - Math.abs(x.bestOdds)),
+      }));
+    }),
 
   /** Admin: full feed dashboard payload (quota, map, health, recent calls). */
   dashboard: adminQuery.query(async () => {
@@ -59,6 +115,14 @@ export const feedRouter = createRouter({
     .mutation(async ({ input }) => {
       if (!hasOddsProvider()) throw new Error("ODDS_API_KEY not configured");
       return syncSportOdds(input.sportCode.toUpperCase());
+    }),
+
+  /** Admin: sync championship / futures markets for a sport (paid, measured). */
+  syncOutrights: adminQuery
+    .input(z.object({ sportCode: z.string().min(2).max(16) }))
+    .mutation(async ({ input }) => {
+      if (!hasOddsProvider()) throw new Error("ODDS_API_KEY not configured");
+      return syncOutrights(input.sportCode.toUpperCase());
     }),
 
   /** Admin: switch data source. LIVE pauses the demo simulator's influence. */

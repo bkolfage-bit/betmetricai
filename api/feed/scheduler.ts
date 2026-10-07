@@ -15,12 +15,21 @@
 import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
 import { getDb } from "../queries/connection";
 import { events, oddsSportMap } from "../../db/schema";
-import { getFeedMode, getQuotaState, syncSportOdds } from "./service";
+import {
+  FORECAST_HORIZON_DAYS,
+  getFeedMode,
+  getQuotaState,
+  syncOutrights,
+  syncSportOdds,
+} from "./service";
 
 const TICK_MS = 30_000;
 const WINDOW_AHEAD_MS = 30 * 60 * 60 * 1000; // poll nothing beyond 30h out
 const LIVE_GRACE_MS = 4 * 60 * 60 * 1000; // keep polling up to 4h after start
 const MAX_EVENTS_PER_CALL = 20;
+const HORIZON_MS = FORECAST_HORIZON_DAYS * 24 * 60 * 60 * 1000;
+const OUTRIGHTS_INTERVAL_MS = 24 * 60 * 60 * 1000; // futures move slowly
+let lastOutrightsRun = 0;
 
 interface TierDef {
   maxAheadMs: number;
@@ -63,7 +72,9 @@ async function tick(): Promise<void> {
     const codes = [...new Set(mapRows.map((r) => r.sportCode))];
 
     for (const code of codes) {
-      // provider-sourced events in the polling window
+      // provider-sourced events in the polling window AND within the
+      // 8-day forecast horizon (championship futures are handled by the
+      // outrights pass below)
       const rows = await db
         .select({
           id: events.id,
@@ -77,7 +88,7 @@ async function tick(): Promise<void> {
           and(
             eq(events.provider, "THE_ODDS_API"),
             inArray(events.status, ["scheduled", "live"]),
-            lte(events.startTime, new Date(now + WINDOW_AHEAD_MS)),
+            lte(events.startTime, new Date(now + Math.min(WINDOW_AHEAD_MS, HORIZON_MS))),
             gte(events.startTime, new Date(now - LIVE_GRACE_MS)),
           ),
         )
@@ -100,6 +111,29 @@ async function tick(): Promise<void> {
         `[feed] ${code}: ${res.rowsWritten} rows (${res.eventsWithOdds} events, cost ${res.cost})` +
           (res.errors.length ? ` ERRORS: ${res.errors.join("; ")}` : ""),
       );
+    }
+
+    // championship / futures exception: outrights sync daily, regardless of
+    // how far out the title settles
+    if (now - lastOutrightsRun >= OUTRIGHTS_INTERVAL_MS) {
+      lastOutrightsRun = now;
+      const mapAll = await db.select().from(oddsSportMap);
+      const outrightCodes = [
+        ...new Set(
+          mapAll
+            .filter((m) => m.status === "outrights_only" || m.providerSportKey.endsWith("_winner"))
+            .map((m) => m.sportCode),
+        ),
+      ];
+      for (const code of outrightCodes) {
+        const r = await syncOutrights(code);
+        if (r.rowsWritten > 0 || r.errors.length > 0) {
+          console.log(
+            `[feed] outrights ${code}: ${r.rowsWritten} rows (${r.participants} participants, cost ${r.cost})` +
+              (r.errors.length ? ` ERRORS: ${r.errors.join("; ")}` : ""),
+          );
+        }
+      }
     }
   } catch (err) {
     console.error("[feed] scheduler tick failed:", err instanceof Error ? err.message : err);

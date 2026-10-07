@@ -20,6 +20,8 @@ import {
   feedOddsSnapshots,
   oddsApiUsage,
   oddsFeedHealth,
+  oddsOutrights,
+  oddsOutrightSnapshots,
   oddsSnapshots,
   oddsSportMap,
   predictions,
@@ -40,6 +42,14 @@ import { matchProviderKeys, SPORT_KEY_RULES } from "./sport-map";
 const PROVIDER = "THE_ODDS_API";
 const MODE_KEY = "odds_feed_mode";
 const BASELINE_KEY = "odds_quota_baseline";
+
+/**
+ * Forecast horizon: only games within 8 days are analyzed and polled.
+ * Exception: championship / futures markets (outrights) — the Super Bowl,
+ * division winners, etc. — are always in scope regardless of date.
+ */
+export const FORECAST_HORIZON_DAYS = 8;
+const HORIZON_MS = FORECAST_HORIZON_DAYS * 24 * 60 * 60 * 1000;
 
 /* ------------------------------- quota ---------------------------------- */
 
@@ -218,6 +228,17 @@ export async function discoverSports(): Promise<DiscoverySummary> {
               lastCheckedAt: new Date(),
             },
           });
+      }
+      // retire keys that disappeared or went inactive since last discovery
+      const activeKeys = new Set(hits.map((h) => h.key));
+      const existing = await db.select().from(oddsSportMap).where(eq(oddsSportMap.sportCode, rule.code));
+      for (const row of existing) {
+        if (!activeKeys.has(row.providerSportKey) && row.status !== "unavailable") {
+          await db
+            .update(oddsSportMap)
+            .set({ status: "unavailable", lastCheckedAt: new Date() })
+            .where(eq(oddsSportMap.id, row.id));
+        }
       }
       if (hits.length === 0) {
         // record the gap explicitly so the UI can say UNAVAILABLE truthfully
@@ -454,7 +475,10 @@ export async function ensureEventPicks(eventId: number, sportCode: string): Prom
       if (Number.isFinite(pOver)) creates.push({ market: "total", selection: pOver >= 0.5 ? "over" : "under" });
     }
   }
+  // moneyline picks only near game time; fights/fights-style always.
+  // beyond the forecast horizon there is no analysis at all.
   const hoursOut = (ev.startTime.getTime() - Date.now()) / 3_600_000;
+  if (hoursOut > FORECAST_HORIZON_DAYS * 24) return;
   if (model.pickMarkets.includes("moneyline") && (hoursOut < 30 || sportCode === "UFC" || sportCode === "TENNIS")) {
     const hasMl = rows.some((r) => r.market === "moneyline");
     if (hasMl) {
@@ -570,6 +594,7 @@ export async function syncSportOdds(
 
       /* ---- phase 1: resolve events, books, freshness (few round-trips) ---- */
       const now = new Date();
+      const horizonCutoff = now.getTime() + HORIZON_MS;
       interface PendingEvent {
         eventId: number;
         books: ReturnType<typeof normalizeEventOdds>;
@@ -578,6 +603,9 @@ export async function syncSportOdds(
       const bookIds = new Map<string, number>();
       for (const ev of res.data) {
         if (ev.bookmakers.length === 0) continue;
+        // forecast horizon: skip games beyond 8 days (championship futures
+        // live in the outrights sync, which is date-independent)
+        if (ev.commenceTime.getTime() > horizonCutoff) continue;
         const books = normalizeEventOdds(ev);
         if (books.length === 0) continue;
         const eventId = await ensureEvent(ev, sportId);
@@ -717,6 +745,113 @@ export async function syncSportOdds(
   } else {
     await markHealth(sportCode, false, result.errors[0]);
   }
+  return result;
+}
+
+/* ------------------------------- outrights ------------------------------- */
+
+/**
+ * Championship / futures sync — the exception to the 8-day horizon.
+ * Discovers *_winner outright keys for a sport from the provider sport map
+ * (never invented) and stores participant prices with no-vig separation
+ * across the full field.
+ */
+export interface OutrightsResult {
+  sportCode: string;
+  keys: string[];
+  participants: number;
+  rowsWritten: number;
+  cost: number;
+  latencyMs: number;
+  errors: string[];
+}
+
+export async function syncOutrights(sportCode: string): Promise<OutrightsResult> {
+  const result: OutrightsResult = {
+    sportCode, keys: [], participants: 0, rowsWritten: 0, cost: 0, latencyMs: 0, errors: [],
+  };
+  const db = getDb();
+  const provider = getOddsProvider();
+  // outright keys: rows marked outrights_only, plus discovered *_winner keys
+  const mapRows = await db
+    .select()
+    .from(oddsSportMap)
+    .where(eq(oddsSportMap.sportCode, sportCode));
+  const keys = mapRows
+    .filter((m) => m.status === "outrights_only" || m.providerSportKey.endsWith("_winner"))
+    // skip keys the provider has deactivated — they 404 on odds requests
+    .filter((m) => m.status !== "unavailable")
+    .map((m) => m.providerSportKey);
+  result.keys = [...new Set(keys)];
+  if (result.keys.length === 0) return result;
+
+  const started = Date.now();
+  for (const key of result.keys) {
+    try {
+      const res = await provider.getOdds(key, {
+        regions: REGIONS(),
+        markets: ["outrights"],
+        bookmakers: BOOKMAKERS(),
+      });
+      result.cost += res.quota.lastRequestCost ?? 1;
+      await logUsage(`/v4/sports/${key}/odds (outrights)`, key, res.quota, res.latencyMs, "ok");
+      const now = new Date();
+
+      for (const ev of res.data) {
+        for (const bk of ev.bookmakers) {
+          const bookId = await ensureSportsbook(bk.key, bk.title);
+          for (const mkt of bk.markets) {
+            if (mkt.key !== "outrights") continue;
+            // no-vig across the full field of participants
+            const field = mkt.outcomes.filter((o) => Number.isFinite(o.price));
+            // provider noise guard: a title market never has 1 participant
+            if (field.length < 2) continue;
+            if (field.length === 0) continue;
+            const nv = noVigN(field.map((o) => Math.round(o.price)));
+            const rows: Array<typeof oddsOutrights.$inferInsert> = field.map((o, i) => ({
+              sportCode,
+              providerSportKey: key,
+              market: mkt.key,
+              sportsbookId: bookId,
+              participant: o.name,
+              americanOdds: Math.round(o.price),
+              decimalOdds: String(americanToDecimal(Math.round(o.price))),
+              impliedProb: String(americanToImplied(Math.round(o.price))),
+              noVigProb: nv[i] != null ? String(nv[i]) : null,
+              providerLastUpdate: new Date(mkt.lastUpdate),
+              fetchedAt: now,
+            }));
+            await db.insert(oddsOutrights).values(rows).onDuplicateKeyUpdate({
+              set: {
+                americanOdds: sql`VALUES(american_odds)`,
+                decimalOdds: sql`VALUES(decimal_odds)`,
+                impliedProb: sql`VALUES(implied_prob)`,
+                noVigProb: sql`VALUES(no_vig_prob)`,
+                providerLastUpdate: sql`VALUES(provider_last_update)`,
+                fetchedAt: sql`VALUES(fetched_at)`,
+              },
+            });
+            for (const row of rows) {
+              try {
+                await db.insert(oddsOutrightSnapshots).values(row);
+              } catch (e) {
+                // duplicate snapshot (same participant, same provider
+                // timestamp) — the dedup backstop working as designed
+                if ((e as { errno?: number })?.errno !== 1062) throw e;
+              }
+            }
+            result.participants += field.length;
+            result.rowsWritten += rows.length;
+          }
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      result.errors.push(msg);
+      await logUsage(`/v4/sports/${key}/odds (outrights)`, key, null, Date.now() - started, "error", msg);
+    }
+  }
+  result.latencyMs = Date.now() - started;
   return result;
 }
 

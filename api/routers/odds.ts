@@ -13,7 +13,7 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { oddsBoard } from "../engine/recompute";
 import type { Market } from "../lib/edge";
-import { getFeedMode } from "../feed/service";
+import { FORECAST_HORIZON_DAYS, getFeedMode } from "../feed/service";
 
 const homeTeams = alias(teams, "home_teams");
 const awayTeams = alias(teams, "away_teams");
@@ -21,7 +21,9 @@ const awayTeams = alias(teams, "away_teams");
 export const oddsRouter = createRouter({
   /** All events with team context, ordered by status then start time.
    *  In LIVE mode only provider-sourced (real-odds) events are listed —
-   *  demo events never mix into a live board. */
+   *  demo events never mix into a live board — and the forecast horizon
+   *  hides games beyond 8 days (championship futures are outrights, not
+   *  events, so they are unaffected). */
   events: publicQuery.query(async () => {
     const db = getDb();
     const live = (await getFeedMode()) === "live";
@@ -33,9 +35,13 @@ export const oddsRouter = createRouter({
       .innerJoin(sports, eq(events.sportId, sports.id))
       .where(live ? eq(events.isDemo, false) : undefined)
       .orderBy(asc(events.startTime));
+    const cutoff = Date.now() + FORECAST_HORIZON_DAYS * 24 * 3_600_000;
+    const visible = live
+      ? rows.filter((r) => r.event.startTime.getTime() <= cutoff)
+      : rows;
     const rank = { live: 0, scheduled: 1, final: 2 };
-    rows.sort((a, b) => rank[a.event.status] - rank[b.event.status]);
-    return rows;
+    visible.sort((a, b) => rank[a.event.status] - rank[b.event.status]);
+    return visible;
   }),
 
   /** Full odds board for one event: all markets × selections × books. */

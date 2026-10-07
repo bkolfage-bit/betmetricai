@@ -147,6 +147,42 @@ export const feedOddsSnapshots = mysqlTable("feed_odds_snapshots", {
   isLive: boolean("is_live").default(false).notNull(),
 });
 
+/**
+ * Outrights / futures — championship and division-winner markets. These are
+ * the exception to the 8-day forecast horizon: a Super Bowl or division
+ * title market is always in scope regardless of how far out it settles.
+ */
+export const oddsOutrights = mysqlTable("odds_outrights", {
+  id: serial("id").primaryKey(),
+  sportCode: varchar("sport_code", { length: 32 }).notNull(),
+  providerSportKey: varchar("provider_sport_key", { length: 128 }).notNull(),
+  market: varchar("market", { length: 64 }).notNull(),
+  sportsbookId: bigint("sportsbook_id", { mode: "number", unsigned: true }).notNull(),
+  participant: varchar("participant", { length: 128 }).notNull(),
+  americanOdds: int("american_odds").notNull(),
+  decimalOdds: decimal("decimal_odds", { precision: 10, scale: 4 }).notNull(),
+  impliedProb: decimal("implied_prob", { precision: 8, scale: 6 }).notNull(),
+  noVigProb: decimal("no_vig_prob", { precision: 8, scale: 6 }),
+  providerLastUpdate: timestamp("provider_last_update").notNull(),
+  fetchedAt: timestamp("fetched_at").notNull(),
+});
+
+/** Outright snapshot history — append-only, deduped by provider timestamp. */
+export const oddsOutrightSnapshots = mysqlTable("odds_outright_snapshots", {
+  id: serial("id").primaryKey(),
+  sportCode: varchar("sport_code", { length: 32 }).notNull(),
+  providerSportKey: varchar("provider_sport_key", { length: 128 }).notNull(),
+  market: varchar("market", { length: 64 }).notNull(),
+  sportsbookId: bigint("sportsbook_id", { mode: "number", unsigned: true }).notNull(),
+  participant: varchar("participant", { length: 128 }).notNull(),
+  americanOdds: int("american_odds").notNull(),
+  decimalOdds: decimal("decimal_odds", { precision: 10, scale: 4 }).notNull(),
+  impliedProb: decimal("implied_prob", { precision: 8, scale: 6 }).notNull(),
+  noVigProb: decimal("no_vig_prob", { precision: 8, scale: 6 }),
+  providerLastUpdate: timestamp("provider_last_update").notNull(),
+  fetchedAt: timestamp("fetched_at").notNull(),
+});
+
 /** Quota tracking straight from provider response headers. */
 export const oddsApiUsage = mysqlTable("odds_api_usage", {
   id: serial("id").primaryKey(),

@@ -14,7 +14,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { latestOddsByBook, oddsBoard } from "../engine/recompute";
 import type { Market } from "../lib/edge";
-import { getFeedMode } from "../feed/service";
+import { FORECAST_HORIZON_DAYS, getFeedMode } from "../feed/service";
 
 const homeTeams = alias(teams, "home_teams");
 const awayTeams = alias(teams, "away_teams");
@@ -67,6 +67,7 @@ export const picksRouter = createRouter({
     const sportMap = new Map(sportRows.map((s) => [s.id, s.code]));
 
     const live = (await getFeedMode()) === "live";
+    const horizonCutoff = Date.now() + FORECAST_HORIZON_DAYS * 24 * 3_600_000;
     const out = picks
       .map((p) => {
         const ev = evRows.find((e) => e.id === p.eventId)!;
@@ -82,8 +83,10 @@ export const picksRouter = createRouter({
           book: v ? bookMap.get(v.sportsbookId) ?? null : null,
         };
       })
-      // LIVE mode: only real-odds events — demo picks never mix in
+      // LIVE mode: only real-odds events — demo picks never mix in —
+      // and nothing beyond the 8-day forecast horizon is analyzed
       .filter((r) => !live || r.event.isDemo === false)
+      .filter((r) => !live || r.event.startTime.getTime() <= horizonCutoff)
       .filter((r) => !input?.sport || r.sportCode === input.sport);
 
     const order = { STRONG_BET: 0, BET: 1, WATCH: 2, HOLD: 3, PASS: 4 };
