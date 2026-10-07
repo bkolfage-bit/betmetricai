@@ -22,10 +22,12 @@ export default function Assistant() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<{ kind: string; text: string } | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
+  // keep the chat pinned to the newest message WITHOUT moving the browser page
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   async function send(text: string) {
@@ -87,9 +89,9 @@ export default function Assistant() {
         sub="The AI assistant reads the verified platform snapshot — odds, probabilities, edges and pick history — and explains it. It never invents numbers."
       />
 
-      <div className="panel flex min-h-[480px] flex-col rounded-sm">
+      <div className="panel flex h-[560px] flex-col rounded-sm">
         {/* messages */}
-        <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
+        <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
           {messages.length === 0 && (
             <div className="flex h-full flex-col items-center justify-center gap-4 py-10 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full border border-primary/40 bg-live-dim">
@@ -147,7 +149,6 @@ export default function Assistant() {
               <span>{error.text}</span>
             </div>
           )}
-          <div ref={bottomRef} />
         </div>
 
         {/* input */}

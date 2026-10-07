@@ -1,5 +1,6 @@
 import { Routes, Route } from "react-router";
 import Layout from "./components/Layout";
+import { ScrollToTop } from "./components/ScrollToTop";
 import Home from "./pages/Home";
 import Picks from "./pages/Picks";
 import Live from "./pages/Live";
@@ -20,7 +21,9 @@ import NotFound from "./pages/NotFound";
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Home />} />
         <Route path="/picks" element={<Picks />} />
@@ -39,7 +42,8 @@ export default function App() {
         <Route path="/admin" element={<Admin />} />
       </Route>
       <Route path="/login" element={<Login />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
   );
 }
