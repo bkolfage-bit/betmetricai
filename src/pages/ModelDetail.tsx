@@ -15,7 +15,6 @@ const SPORT_NAMES: Record<string, string> = {
   TENNIS: "Tennis",
   GOLF: "Golf",
   UFC: "UFC / MMA",
-  MOTORSPORTS: "Motorsports",
 };
 
 const PIPELINE_STEPS = [

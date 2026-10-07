@@ -14,7 +14,6 @@ const SPORT_NAMES: Record<string, string> = {
   TENNIS: "Tennis",
   GOLF: "Golf",
   UFC: "UFC / MMA",
-  MOTORSPORTS: "Motorsports",
 };
 
 function HealthBadge({ status }: { status: string }) {

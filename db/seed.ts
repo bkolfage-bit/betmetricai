@@ -240,21 +240,6 @@ const UFC_EVENTS: EventSpec[] = [
   { h: 1, a: 7, offsetH: 36, status: "scheduled", venue: "T-Mobile Arena, Las Vegas — Featherweight" },
 ];
 
-const F1_DRIVERS: Competitor[] = [
-  { city: "Red Bull", name: "M. Verstappen", abbr: "VER", ratings: { driverRating: 97, carRating: 96, qualiPos: 1, trackHist: 2.4, incidentRate: 0.04 } },
-  { city: "McLaren", name: "L. Norris", abbr: "NOR", ratings: { driverRating: 93, carRating: 95, qualiPos: 2, trackHist: 1.6, incidentRate: 0.06 } },
-  { city: "Ferrari", name: "C. Leclerc", abbr: "LEC", ratings: { driverRating: 92, carRating: 91, qualiPos: 3, trackHist: 1.9, incidentRate: 0.07 } },
-  { city: "McLaren", name: "O. Piastri", abbr: "PIA", ratings: { driverRating: 91, carRating: 95, qualiPos: 4, trackHist: 0.8, incidentRate: 0.05 } },
-  { city: "Ferrari", name: "L. Hamilton", abbr: "HAM", ratings: { driverRating: 93, carRating: 91, qualiPos: 5, trackHist: 2.8, incidentRate: 0.05 } },
-  { city: "Mercedes", name: "G. Russell", abbr: "RUS", ratings: { driverRating: 90, carRating: 89, qualiPos: 6, trackHist: 1.1, incidentRate: 0.05 } },
-  { city: "Williams", name: "C. Sainz", abbr: "SAI", ratings: { driverRating: 89, carRating: 84, qualiPos: 7, trackHist: 1.4, incidentRate: 0.06 } },
-  { city: "Aston Martin", name: "F. Alonso", abbr: "ALO", ratings: { driverRating: 91, carRating: 82, qualiPos: 8, trackHist: 2.1, incidentRate: 0.07 } },
-];
-const F1_EVENTS: EventSpec[] = [
-  { h: 0, a: 1, offsetH: 48, status: "scheduled", venue: "Circuit of the Americas — H2H matchup", weather: "88°F, dry", injuries: "" },
-  { h: 4, a: 2, offsetH: 48, status: "scheduled", venue: "Circuit of the Americas — H2H matchup", weather: "88°F, dry" },
-];
-
 const SPORT_DATA: Record<string, { teams: Competitor[]; events: EventSpec[]; name: string }> = {
   NFL: { teams: NFL_TEAMS, events: NFL_EVENTS, name: "NFL Football" },
   NBA: { teams: NBA_TEAMS, events: NBA_EVENTS, name: "NBA Basketball" },
@@ -266,7 +251,6 @@ const SPORT_DATA: Record<string, { teams: Competitor[]; events: EventSpec[]; nam
   TENNIS: { teams: TENNIS_PLAYERS, events: TENNIS_EVENTS, name: "Tennis" },
   GOLF: { teams: GOLF_PLAYERS, events: GOLF_EVENTS, name: "Golf" },
   UFC: { teams: UFC_FIGHTERS, events: UFC_EVENTS, name: "UFC / MMA" },
-  MOTORSPORTS: { teams: F1_DRIVERS, events: F1_EVENTS, name: "Formula 1" },
 };
 
 /* ============================== seed driver ============================== */
@@ -688,7 +672,7 @@ async function seed() {
   // measures and reports. Everything is labeled DEMO DATA.
   const HIST_COUNT: Record<string, number> = {
     NFL: 148, NBA: 92, MLB: 84, NHL: 72, NCAAF: 42, NCAAB: 40,
-    SOCCER: 62, TENNIS: 30, GOLF: 20, UFC: 20, MOTORSPORTS: 14,
+    SOCCER: 62, TENNIS: 30, GOLF: 20, UFC: 20,
   };
   const histByCode: Record<string, Array<typeof pickHistory.$inferInsert>> = {};
   for (const code of SPORT_ORDER) {

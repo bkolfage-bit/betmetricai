@@ -1,7 +1,7 @@
 /**
  * Model registry — every sport module implementing the common interface.
  * Implementation order (§31): NFL → NBA → MLB → NHL → NCAAF → NCAAB →
- * Soccer → Tennis → Golf → UFC/MMA → Motorsports.
+ * Soccer → Tennis → Golf → UFC/MMA.
  */
 import type { SportModel } from "./interface";
 import { nflModel } from "./nfl";
@@ -14,7 +14,6 @@ import { soccerModel } from "./soccer";
 import { tennisModel } from "./tennis";
 import { golfModel } from "./golf";
 import { ufcModel } from "./ufc";
-import { motorsportsModel } from "./motorsports";
 
 export const SPORT_MODELS: Record<string, SportModel> = {
   NFL: nflModel,
@@ -27,7 +26,6 @@ export const SPORT_MODELS: Record<string, SportModel> = {
   TENNIS: tennisModel,
   GOLF: golfModel,
   UFC: ufcModel,
-  MOTORSPORTS: motorsportsModel,
 };
 
 export const SPORT_ORDER = [
@@ -41,7 +39,6 @@ export const SPORT_ORDER = [
   "TENNIS",
   "GOLF",
   "UFC",
-  "MOTORSPORTS",
 ] as const;
 
 export function getSportModel(sportCode: string): SportModel {

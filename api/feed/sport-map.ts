@@ -49,10 +49,6 @@ export const SPORT_KEY_RULES: SportRule[] = [
     matcher: { kind: "prefix", prefixes: ["golf_"] },
     outrightsOnly: true,
   },
-  {
-    code: "MOTORSPORTS",
-    matcher: { kind: "prefix", prefixes: ["motorsport", "nascar", "formula"] },
-  },
 ];
 
 export function matchProviderKeys(rule: SportRule, discovered: ProviderSport[]): ProviderSport[] {

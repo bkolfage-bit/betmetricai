@@ -84,6 +84,9 @@ function Ticker() {
           : `${p.pick.selection === "over" ? "O" : "U"}${p.version!.line}`;
     return (
       <span key={p.pick.id} className="mx-5 inline-flex items-center gap-2 font-mono2 text-[11px]">
+        <span className="rounded-sm border border-border px-1 py-px text-[9px] font-bold tracking-[0.1em] text-muted-foreground">
+          {p.sportCode}
+        </span>
         <span className="text-muted-foreground">{p.away.abbr}@{p.home.abbr}</span>
         <span className="font-bold text-foreground">{sel}</span>
         <span className="text-pos">{fmtOdds(p.version!.odds)}</span>
@@ -175,7 +178,7 @@ export default function Layout() {
               <DataSourceBadge mode={feed.mode} degraded={feedDegraded} />
             </span>
             <span className="hidden font-mono2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground sm:inline">
-              11 SPORTS · QUANT ENSEMBLES
+              10 SPORTS · QUANT ENSEMBLES
             </span>
           </span>
         </div>

@@ -3,7 +3,7 @@ import { trpc } from "@/providers/trpc";
 import { EmptyState, SectionHead, StatusBadge } from "@/components/bits";
 import { useSportFilter } from "@/providers/sport-filter";
 import { cn } from "@/lib/utils";
-import { fmtLine, fmtOdds, num, pct, signedPct, timeAgo } from "@/lib/format";
+import { fmtLine, fmtOdds, fmtTime, num, pct, signedPct, timeAgo } from "@/lib/format";
 
 export default function PlusEV() {
   const { sport } = useSportFilter();
@@ -41,7 +41,7 @@ export default function PlusEV() {
         <table className="w-full min-w-[760px] border-collapse font-mono2 text-xs">
           <thead>
             <tr className="border-b border-border text-left">
-              {["SPORT", "EVENT", "SELECTION", "BOOK", "PRICE", "MODEL", "IMPLIED", "EDGE", "EV/UNIT", "AI EDGE", "STATUS", "UPDATED"].map((h) => (
+              {["SPORT", "EVENT", "DATE", "SELECTION", "BOOK", "PRICE", "MODEL", "IMPLIED", "EDGE", "EV/UNIT", "AI EDGE", "STATUS", "UPDATED"].map((h) => (
                 <th key={h} className="label-caps px-3 py-2.5 font-normal">{h}</th>
               ))}
             </tr>
@@ -55,6 +55,9 @@ export default function PlusEV() {
                   <td className="px-3 py-2.5 whitespace-nowrap">
                     {p.away.abbr} @ {p.home.abbr}
                     {p.event.status === "live" && <span className="ml-2 text-live">●LIVE</span>}
+                  </td>
+                  <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">
+                    {fmtTime(p.event.startTime)}
                   </td>
                   <td className="px-3 py-2.5 font-bold whitespace-nowrap">
                     {p.pick.market === "moneyline"

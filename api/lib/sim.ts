@@ -92,7 +92,7 @@ function periodLabel(code: string, idx: number): string {
 /** Clock display for the current position in the game. */
 function clockLabel(code: string, cfg: LiveConfig, gameMin: number): string | null {
   if (code === "SOCCER") return `${Math.min(90, Math.floor(gameMin))}'`;
-  if (code === "TENNIS" || code === "GOLF" || code === "MOTORSPORTS" || code === "MLB")
+  if (code === "TENNIS" || code === "GOLF" || code === "MLB")
     return null;
   const per = cfg.gameMinutes / cfg.periods;
   const idx = Math.min(cfg.periods, Math.floor(gameMin / per) + 1);
