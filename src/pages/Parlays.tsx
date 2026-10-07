@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/providers/trpc";
+import { useSportFilter } from "@/providers/sport-filter";
 import { SectionHead } from "@/components/bits";
 import { fmtOdds, pct, signedPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -10,10 +11,19 @@ export default function Parlays() {
   const [target, setTarget] = useState<string>("600");
   const [useTarget, setUseTarget] = useState(true);
   const [req, setReq] = useState<{ legs: number; targetOdds: number | null } | null>(null);
+  const { hidden, allVisible } = useSportFilter();
+  const { data: sportRows } = trpc.models.sports.useQuery();
+  const visibleSports = (sportRows ?? [])
+    .map((x) => x.code)
+    .filter((c) => !hidden.includes(c));
 
-  const { data, isFetching } = trpc.parlays.suggest.useQuery(req ?? { legs, targetOdds: null }, {
-    enabled: req !== null,
-  });
+  const { data, isFetching } = trpc.parlays.suggest.useQuery(
+    {
+      ...(req ?? { legs, targetOdds: null }),
+      sports: allVisible ? undefined : visibleSports,
+    },
+    { enabled: req !== null },
+  );
 
   return (
     <div className="flex flex-col gap-6">

@@ -1,13 +1,16 @@
-import { useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { SectionHead, Sparkline } from "@/components/bits";
-import { SportFilter } from "@/components/SportFilter";
+import { useSportFilter } from "@/providers/sport-filter";
 import { fmtOdds, fmtTime, num, pct, signedPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export default function Performance() {
-  const [sport, setSport] = useState<string | null>(null);
-  const { data } = trpc.performance.summary.useQuery(sport ? { sport } : undefined);
+  const { hidden, allVisible } = useSportFilter();
+  const { data: sportRows } = trpc.models.sports.useQuery();
+  const visible = (sportRows ?? []).map((x) => x.code).filter((c) => !hidden.includes(c));
+  const { data } = trpc.performance.summary.useQuery(
+    allVisible ? undefined : { sports: visible },
+  );
   if (!data) {
     return <div className="panel animate-pulse rounded-sm p-10 text-center font-mono2 text-xs text-muted-foreground">LOADING AUDIT TRAIL…</div>;
   }
@@ -20,8 +23,6 @@ export default function Performance() {
         title="AI performance — full transparency"
         sub="Every graded pick is auditable. Losing picks are never hidden, records are never restated."
       />
-
-      <SportFilter value={sport} onChange={setSport} />
 
       {/* headline stats */}
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-border bg-border font-mono2 sm:grid-cols-4 lg:grid-cols-8">
@@ -66,7 +67,9 @@ export default function Performance() {
             </tr>
           </thead>
           <tbody>
-            {data.sports.map((sp) => (
+            {data.sports
+              .filter((sp) => !hidden.includes(sp.sportCode))
+              .map((sp) => (
               <tr key={sp.sportCode} className="border-b border-border/60 last:border-0">
                 <td className="px-4 py-2.5 font-bold">{sp.sportCode}</td>
                 <td className="px-4 py-2.5 tabular-nums">{sp.total}</td>
@@ -76,7 +79,7 @@ export default function Performance() {
                 <td className={cn("px-4 py-2.5 tabular-nums", sp.avgClv >= 0 ? "text-pos" : "text-neg")}>{sp.avgClv.toFixed(2)}%</td>
                 <td className="px-4 py-2.5 tabular-nums">{pct(sp.posClvPct, 0)}</td>
               </tr>
-            ))}
+              ))}
           </tbody>
         </table>
       </section>

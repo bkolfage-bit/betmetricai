@@ -3,13 +3,16 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import './index.css'
 import { TRPCProvider } from "@/providers/trpc"
+import { SportFilterProvider } from "@/providers/sport-filter"
 import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <TRPCProvider>
-        <App />
+        <SportFilterProvider>
+          <App />
+        </SportFilterProvider>
       </TRPCProvider>
     </BrowserRouter>
   </StrictMode>,

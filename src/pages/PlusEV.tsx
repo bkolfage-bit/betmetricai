@@ -1,20 +1,20 @@
 import { useMemo, useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { EmptyState, SectionHead, StatusBadge } from "@/components/bits";
-import { SportFilter } from "@/components/SportFilter";
+import { useSportFilter } from "@/providers/sport-filter";
 import { cn } from "@/lib/utils";
 import { fmtLine, fmtOdds, num, pct, signedPct, timeAgo } from "@/lib/format";
 
 export default function PlusEV() {
-  const [sport, setSport] = useState<string | null>(null);
-  const { data } = trpc.picks.list.useQuery(sport ? { sport } : undefined, { refetchInterval: 15000 });
+  const { isVisible } = useSportFilter();
+  const { data } = trpc.picks.list.useQuery(undefined, { refetchInterval: 15000 });
   const [minEv, setMinEv] = useState(0);
 
   const rows = useMemo(() => {
     return (data ?? [])
-      .filter((p) => p.version && num(p.version.ev) > minEv / 100)
+      .filter((p) => isVisible(p.sportCode) && p.version && num(p.version.ev) > minEv / 100)
       .sort((a, b) => num(b.version!.ev) - num(a.version!.ev));
-  }, [data, minEv]);
+  }, [data, minEv, isVisible]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -36,8 +36,6 @@ export default function PlusEV() {
           </label>
         }
       />
-
-      <SportFilter value={sport} onChange={setSport} />
 
       <div className="panel overflow-x-auto rounded-sm">
         <table className="w-full min-w-[760px] border-collapse font-mono2 text-xs">
