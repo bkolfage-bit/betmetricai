@@ -4,14 +4,12 @@ import { SectionHead } from "@/components/bits";
 import {
   ArrowRight,
   Brain,
-  CircleDot,
   Dices,
   Gauge,
   LineChart,
   Scale,
   Shield,
   Sigma,
-  Swords,
   Trophy,
 } from "lucide-react";
 
@@ -40,17 +38,6 @@ const MARKET_TRIGGERS = [
   "weather conditions change",
   "new player information becomes available",
   "live game conditions change",
-];
-
-const SPORT_MODELS = [
-  { icon: Trophy, name: "Football", desc: "Efficiency, EPA, quarterback performance, game script and weather." },
-  { icon: CircleDot, name: "Basketball", desc: "Pace, efficiency, player usage, rotations and lineup changes." },
-  { icon: CircleDot, name: "Baseball", desc: "Starting pitchers, bullpens, batter matchups, park factors and pitch characteristics." },
-  { icon: CircleDot, name: "Hockey", desc: "Expected goals, shot quality, special teams and goaltending." },
-  { icon: CircleDot, name: "Soccer", desc: "Expected goals, attack and defensive strength, lineups and draw probability." },
-  { icon: CircleDot, name: "Tennis", desc: "Surface-specific performance, serve/return efficiency and point-by-point match probabilities." },
-  { icon: CircleDot, name: "Golf", desc: "Full tournament-field simulation using player performance, course fit and conditions." },
-  { icon: Swords, name: "Combat sports", desc: "Striking, grappling, finishing ability, opponent quality and fight-specific matchups." },
 ];
 
 const TRACKED_METRICS = [
@@ -238,23 +225,6 @@ export default function About() {
             <LineChart className="h-4 w-4 text-primary" />
             Every pick version is stored — the full timeline stays visible.
           </div>
-        </div>
-      </section>
-
-      {/* EVERY SPORT IS DIFFERENT */}
-      <section>
-        <SectionHead
-          title="Every sport is different"
-          sub="We don't believe one generic AI model should predict every sport. Different sports require different mathematics — our platform is built accordingly."
-        />
-        <div className="grid gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
-          {SPORT_MODELS.map((s) => (
-            <div key={s.name} className="bg-card p-5 transition-colors hover:bg-secondary">
-              <s.icon className="h-4 w-4 text-primary" />
-              <p className="mt-2.5 font-mono2 text-xs font-bold uppercase tracking-[0.14em]">{s.name}</p>
-              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{s.desc}</p>
-            </div>
-          ))}
         </div>
       </section>
 
