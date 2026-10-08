@@ -75,23 +75,17 @@ export function EdgeDial({ score, size = 120 }: { score: number; size?: number }
 }
 
 /**
- * Data freshness: the LED reflects the FEED's age (never pretend stale
- * data is live); the text can show the age of the specific item.
+ * Last-update indicator: always shows when the data was last refreshed —
+ * never a "delayed/stale" warning.
  */
 export function Freshness({
   at,
   live = false,
   text,
-  expectedSec,
 }: {
   at: Date | string | null | undefined;
   live?: boolean;
   text?: string;
-  /** How often the feed is actually expected to refresh right now (seconds).
-   *  Odds poll on adaptive tiers — 60s for live games, up to 30min for games
-   *  days away — so "delayed" only applies when data is older than the
-   *  current polling cadence (plus a small grace), not a fixed threshold. */
-  expectedSec?: number | null;
 }) {
   const [, force] = useState(0);
   useEffect(() => {
@@ -99,28 +93,13 @@ export function Freshness({
     return () => clearInterval(t);
   }, []);
   const d = at ? (typeof at === "string" ? new Date(at) : at) : null;
-  const ageSec = d ? (Date.now() - d.getTime()) / 1000 : Infinity;
-  const thresholdSec = expectedSec != null ? expectedSec + 45 : 150;
-  const stale = ageSec > thresholdSec;
-  const cadence =
-    expectedSec != null && expectedSec > 150
-      ? ` · checks every ~${Math.round(expectedSec / 60)}m`
-      : "";
   return (
     <span className="inline-flex items-center gap-1.5 font-mono2 text-[10px] uppercase tracking-[0.14em]">
-      {stale ? (
-        <>
-          <span className="led led-neg" />
-          <span className="text-neg">Data delayed</span>
-          <span className="text-muted-foreground">· updated {timeAgo(d)}</span>
-        </>
-      ) : (
-        <>
-          <span className={cn("led", live ? "led-live" : "led-pos")} />
-          <span className={live ? "text-live" : "text-pos"}>{live ? "Live" : "Fresh"}</span>
-          <span className="text-muted-foreground">· {text ?? `updated ${timeAgo(d)}${cadence}`}</span>
-        </>
-      )}
+      <span className={cn("led", live ? "led-live" : "led-pos")} />
+      {live && <span className="text-live">Live</span>}
+      <span className="text-muted-foreground">
+        {live ? "· " : ""}{text ?? `updated ${d ? timeAgo(d) : "—"}`}
+      </span>
     </span>
   );
 }
