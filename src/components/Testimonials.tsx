@@ -6,11 +6,39 @@ import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 /**
- * Testimonial carousel — shows ONLY genuine, admin-approved customer reviews
- * from the database. No sample or illustrative copy anywhere: until the
- * first real review is approved, the section shows an honest empty state
- * inviting customers to be the first to leave one.
+ * Illustrative sample copy — shown ONLY until genuine, admin-approved
+ * customer reviews exist. These are never stored in the database and are
+ * never presented as verified customer feedback. When the first real
+ * approved review lands, the carousel switches to real reviews only.
  */
+const SAMPLE_QUOTES = [
+  "The amount of information available in one place is exactly what I've been looking for. AI predictions, sportsbook odds, and betting analysis together.",
+  "Being able to compare odds across sportsbooks without checking multiple apps makes researching bets so much easier.",
+  "The AI Edge scoring system makes complex betting data much easier to understand.",
+  "I love the idea of seeing the probability behind a prediction instead of just being told which team to pick.",
+  "Having advanced statistical models working behind the scenes is what makes this concept stand out.",
+  "The +EV opportunities section could completely change how I research potential bets.",
+  "Finally, a platform focused on probabilities, data, and value instead of hype.",
+  "Comparing multiple sportsbooks and identifying the best available price is a feature I'd use constantly.",
+  "The detailed AI explanations make sophisticated sports analytics feel accessible.",
+  "Tracking line movement alongside AI predictions is incredibly useful.",
+  "The player prop analysis is one of the features I'm most excited about.",
+  "I appreciate a system that explains why a betting opportunity might offer value.",
+  "The combination of machine learning, simulations, and real-time odds is impressive.",
+  "Being able to see when an AI recommendation changes as the odds move is a fantastic concept.",
+  "This is the kind of analytical toolkit serious sports fans have been waiting for.",
+  "The clean interface and easy-to-read predictions would make researching games much faster.",
+  "I like that the platform focuses on long-term expected value rather than promising guaranteed winners.",
+  "Having separate prediction models for different sports makes much more sense than using one generic system.",
+  "The AI-powered analysis could help me better understand the factors affecting each matchup.",
+  "Seeing model probabilities next to sportsbook probabilities makes the numbers much more meaningful.",
+  "The bankroll tracking and performance analytics would be a great addition to my research routine.",
+  "I'd love having injury updates, matchup data, and sportsbook prices available on one dashboard.",
+  "The transparency around model confidence and historical performance is exactly what I'd want.",
+  "Being able to filter opportunities by sport, market, and expected value would save a lot of time.",
+  "The approach feels much more analytical than traditional sports pick websites.",
+  "The idea of giving everyday bettors access to advanced quantitative tools is what makes this platform awesome and my #1 site.",
+];
 
 function Stars({ n, className }: { n: number; className?: string }) {
   return (
@@ -158,10 +186,11 @@ function ReviewForm() {
 
 export function Testimonials() {
   const { data } = trpc.testimonials.list.useQuery();
-  const reviews = data?.reviews ?? [];
+  const real = data?.reviews ?? [];
+  const showingReal = real.length > 0;
   const trackRef = useRef<HTMLDivElement>(null);
   const [canLeft, setCanLeft] = useState(false);
-  const [canRight, setCanRight] = useState(false);
+  const [canRight, setCanRight] = useState(true);
 
   const updateArrows = () => {
     const el = trackRef.current;
@@ -173,7 +202,7 @@ export function Testimonials() {
     updateArrows();
     window.addEventListener("resize", updateArrows);
     return () => window.removeEventListener("resize", updateArrows);
-  }, [reviews.length]);
+  }, [showingReal, real.length]);
 
   const scroll = (dir: 1 | -1) => {
     const el = trackRef.current;
@@ -189,7 +218,7 @@ export function Testimonials() {
         <div className="max-w-2xl">
           <p className="label-caps mb-3 flex items-center gap-2">
             <MessageSquareQuote className="h-3.5 w-3.5 text-primary" />
-            Verified customer reviews
+            {showingReal ? "Verified customer reviews" : "What bettors are saying"}
           </p>
           <h2 className="text-3xl font-extrabold leading-[1.08] tracking-tight sm:text-4xl">
             BUILT FOR BETTORS WHO <span className="text-primary">WANT AN EDGE</span>
@@ -199,62 +228,72 @@ export function Testimonials() {
             analyze sports, compare odds, and discover potential betting value.
           </p>
         </div>
-        {reviews.length > 1 && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => scroll(-1)}
-              disabled={!canLeft}
-              aria-label="Scroll testimonials left"
-              className="flex h-9 w-9 items-center justify-center rounded-sm border border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-30"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => scroll(1)}
-              disabled={!canRight}
-              aria-label="Scroll testimonials right"
-              className="flex h-9 w-9 items-center justify-center rounded-sm border border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-30"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => scroll(-1)}
+            disabled={!canLeft}
+            aria-label="Scroll testimonials left"
+            className="flex h-9 w-9 items-center justify-center rounded-sm border border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-30"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => scroll(1)}
+            disabled={!canRight}
+            aria-label="Scroll testimonials right"
+            className="flex h-9 w-9 items-center justify-center rounded-sm border border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-30"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
-      {/* carousel: 3 cards desktop · 2 tablet · 1 mobile · touch swipe native */}
-      {reviews.length > 0 ? (
-        <div
-          ref={trackRef}
-          onScroll={updateArrows}
-          className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {reviews.map((r) => (
-            <figure
-              key={r.id}
-              data-card
-              className="panel flex w-full shrink-0 snap-start flex-col rounded-sm p-5 sm:w-[calc(50%-8px)] lg:w-[calc(33.333%-11px)]"
-            >
-              <Stars n={r.rating} />
-              <blockquote className="mt-3 flex-1 text-sm leading-relaxed text-foreground/90">
-                "{r.text}"
-              </blockquote>
-              <figcaption className="mt-4 border-t border-border/60 pt-3 font-mono2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                {r.displayName}
-                {r.verified === 1 && <span className="ml-2 text-pos">· verified customer</span>}
-              </figcaption>
-            </figure>
-          ))}
-        </div>
-      ) : (
-        <div className="panel rounded-sm px-6 py-10 text-center">
-          <p className="text-sm font-bold">No reviews yet — be the first.</p>
-          <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed text-muted-foreground">
-            We only publish genuine customer feedback, exactly as submitted.
-            Every review is moderated before it appears here — nothing is
-            invented, edited, or padded with examples.
-          </p>
-        </div>
+      {!showingReal && (
+        <p className="rounded-sm border border-warn/30 bg-warn-dim/40 px-4 py-2 font-mono2 text-[10px] uppercase tracking-[0.14em] text-warn">
+          Illustrative user feedback — examples only. Real customer reviews
+          appear here once submitted and approved.
+        </p>
       )}
+
+      {/* carousel: 3 cards desktop · 2 tablet · 1 mobile · touch swipe native */}
+      <div
+        ref={trackRef}
+        onScroll={updateArrows}
+        className="-mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {showingReal
+          ? real.map((r) => (
+              <figure
+                key={r.id}
+                data-card
+                className="panel flex w-full shrink-0 snap-start flex-col rounded-sm p-5 sm:w-[calc(50%-8px)] lg:w-[calc(33.333%-11px)]"
+              >
+                <Stars n={r.rating} />
+                <blockquote className="mt-3 flex-1 text-sm leading-relaxed text-foreground/90">
+                  "{r.text}"
+                </blockquote>
+                <figcaption className="mt-4 border-t border-border/60 pt-3 font-mono2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                  {r.displayName}
+                  {r.verified === 1 && <span className="ml-2 text-pos">· verified customer</span>}
+                </figcaption>
+              </figure>
+            ))
+          : SAMPLE_QUOTES.map((q, i) => (
+              <figure
+                key={i}
+                data-card
+                className="panel flex w-full shrink-0 snap-start flex-col rounded-sm p-5 sm:w-[calc(50%-8px)] lg:w-[calc(33.333%-11px)]"
+              >
+                <Stars n={5} />
+                <blockquote className="mt-3 flex-1 text-sm leading-relaxed text-foreground/90">
+                  "{q}"
+                </blockquote>
+                <figcaption className="mt-4 border-t border-border/60 pt-3 font-mono2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60">
+                  Example feedback
+                </figcaption>
+              </figure>
+            ))}
+      </div>
 
       <ReviewForm />
     </section>
