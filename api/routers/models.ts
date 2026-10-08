@@ -322,6 +322,44 @@ export const modelsRouter = createRouter({
   }),
 
   /** Sport metadata for filter rails (code, name, status, event counts). */
+  /** v2 upgrade transparency: walk-forward validation per sport, data
+   *  corpus sizes, and which models are deployed vs. held back. */
+  upgradeReport: publicQuery.query(async () => {
+    const db = getDb();
+    const { gameResults, modelValidation } = await import("@db/schema");
+    const corpus = await db
+      .select({ sportCode: gameResults.sportCode, n: sql<number>`count(*)` })
+      .from(gameResults)
+      .groupBy(gameResults.sportCode);
+    const corpusBy = new Map(corpus.map((c) => [c.sportCode, Number(c.n)]));
+    const vals = await db
+      .select()
+      .from(modelValidation)
+      .orderBy(desc(modelValidation.evaluatedAt));
+    // latest v1+v2 per sport
+    const bySport = new Map<string, { v1?: typeof vals[number]; v2?: typeof vals[number] }>();
+    for (const v of vals) {
+      const e = bySport.get(v.sportCode) ?? {};
+      if (v.modelVersion === "v2" && !e.v2) e.v2 = v;
+      if (v.modelVersion === "v1" && !e.v1) e.v1 = v;
+      bySport.set(v.sportCode, e);
+    }
+    const out = [...bySport.entries()].map(([sportCode, e]) => ({
+      sportCode,
+      corpusGames: corpusBy.get(sportCode) ?? 0,
+      v2: e.v2 ? {
+        brier: parseFloat(e.v2.brier), logLoss: parseFloat(e.v2.logLoss),
+        gamesEvaluated: e.v2.gamesEvaluated, trainedGames: e.v2.trainedGames,
+        maeMargin: e.v2.maeMargin ? parseFloat(e.v2.maeMargin) : null,
+        evaluatedAt: e.v2.evaluatedAt,
+      } : null,
+      v1: e.v1 ? { brier: parseFloat(e.v1.brier), logLoss: parseFloat(e.v1.logLoss) } : null,
+      deployed: !!(e.v1 && e.v2 && parseFloat(e.v2.brier) < parseFloat(e.v1.brier)),
+    }));
+    out.sort((a, b) => b.corpusGames - a.corpusGames);
+    return { sports: out, totalCorpus: corpus.reduce((s, c) => s + Number(c.n), 0) };
+  }),
+
   sports: publicQuery.query(async () => {
     const db = getDb();
     const rows = await db.select().from(sports);

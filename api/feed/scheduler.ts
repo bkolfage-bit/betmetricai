@@ -33,9 +33,11 @@ const HORIZON_MS = FORECAST_HORIZON_DAYS * 24 * 60 * 60 * 1000;
 const OUTRIGHTS_INTERVAL_MS = 24 * 60 * 60 * 1000; // futures move slowly
 const SCORES_INTERVAL_MS = 5 * 60 * 1000; // /scores: 1 credit per sport-key
 const PM_INTERVAL_MS = 10 * 60 * 1000; // prediction markets: free public APIs
+const V2_INTERVAL_MS = 24 * 60 * 60 * 1000; // v2 model re-train/validate daily
 let lastOutrightsRun = 0;
 let lastScoresRun = 0;
 let lastPmRun = 0;
+let lastV2Run = 0;
 
 interface TierDef {
   maxAheadMs: number;
@@ -153,6 +155,19 @@ async function tick(): Promise<void> {
               ? ` ERRORS: ${[...pm.kalshi.errors, ...pm.polymarket.errors].join("; ").slice(0, 300)}`
               : ""),
         );
+      }
+    }
+
+    // v2 model maintenance: daily — ingest newly completed games, then
+    // re-validate and re-deploy only where v2 still beats v1
+    if (now - lastV2Run >= V2_INTERVAL_MS) {
+      lastV2Run = now;
+      try {
+        const { refreshV2 } = await import("../v2/refresh");
+        const r = await refreshV2();
+        console.log(`[v2] refresh: ${r.ingested} new games ingested; deployed ${r.deployedSports.join(",") || "none"}; held back ${r.heldBack.join(",") || "none"}`);
+      } catch (e) {
+        console.error("[v2] refresh failed:", e instanceof Error ? e.message : e);
       }
     }
 

@@ -547,3 +547,41 @@ export const pmPriceSnapshots = mysqlTable("pm_price_snapshots", {
   volume: decimal("volume", { precision: 16, scale: 2 }),
   capturedAt: timestamp("capturedAt").defaultNow().notNull(),
 });
+
+/* ---------------------- v2 trained-model infrastructure ---------------------- */
+
+/**
+ * Real completed game results ingested from official free sources
+ * (ESPN scoreboard API, MLB Stats API, NHL API). This is the training
+ * corpus for the v2 models — real historical outcomes only, never
+ * fabricated. Deduped by (sportCode, source, sourceGameId).
+ */
+export const gameResults = mysqlTable("game_results", {
+  id: serial("id").primaryKey(),
+  sportCode: varchar("sportCode", { length: 16 }).notNull(),
+  source: varchar("source", { length: 32 }).notNull(), // ESPN | MLB_STATS | NHL_API
+  sourceGameId: varchar("sourceGameId", { length: 64 }).notNull(),
+  gameDate: varchar("gameDate", { length: 10 }).notNull(), // YYYY-MM-DD
+  startTime: timestamp("startTime"),
+  homeName: varchar("homeName", { length: 128 }).notNull(),
+  awayName: varchar("awayName", { length: 128 }).notNull(),
+  homeScore: int("homeScore").notNull(),
+  awayScore: int("awayScore").notNull(),
+  neutral: boolean("neutral").default(false).notNull(),
+  completed: boolean("completed").default(true).notNull(),
+});
+
+/** Walk-forward validation record per sport/model — objective proof that a
+ *  v2 model outperforms its v1 baseline before it is deployed. */
+export const modelValidation = mysqlTable("model_validation", {
+  id: serial("id").primaryKey(),
+  sportCode: varchar("sportCode", { length: 16 }).notNull(),
+  modelVersion: varchar("modelVersion", { length: 32 }).notNull(), // v1 | v2
+  gamesEvaluated: int("gamesEvaluated").notNull(),
+  brier: decimal("brier", { precision: 9, scale: 6 }).notNull(),
+  logLoss: decimal("logLoss", { precision: 9, scale: 6 }).notNull(),
+  maeMargin: decimal("maeMargin", { precision: 8, scale: 3 }),
+  maeTotal: decimal("maeTotal", { precision: 8, scale: 3 }),
+  trainedGames: int("trainedGames").notNull(),
+  evaluatedAt: timestamp("evaluatedAt").defaultNow().notNull(),
+});

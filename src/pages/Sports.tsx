@@ -40,6 +40,58 @@ function HealthBadge({ status }: { status: string }) {
   );
 }
 
+function UpgradeReport() {
+  const { data } = trpc.models.upgradeReport.useQuery();
+  if (!data || data.sports.length === 0) return null;
+  return (
+    <div className="panel rounded-sm p-5">
+      <p className="font-mono2 text-xs font-extrabold tracking-[0.14em] text-foreground">
+        MODEL UPGRADE v2.0 — WALK-FORWARD VALIDATION
+      </p>
+      <p className="mt-1 font-mono2 text-[10px] text-muted-foreground">
+        Trained on {data.totalCorpus.toLocaleString()} real completed games (ESPN / MLB Stats / NHL official APIs).
+        A v2 model is deployed only where it beats its v1 baseline on out-of-sample Brier score. Held-back sports keep the v1 model.
+      </p>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full font-mono2 text-[10px]">
+          <thead>
+            <tr className="border-b border-border text-left text-muted-foreground">
+              <th className="py-1.5 pr-4">SPORT</th>
+              <th className="py-1.5 pr-4">CORPUS</th>
+              <th className="py-1.5 pr-4">TRAINED</th>
+              <th className="py-1.5 pr-4">EVAL</th>
+              <th className="py-1.5 pr-4">V1 BRIER</th>
+              <th className="py-1.5 pr-4">V2 BRIER</th>
+              <th className="py-1.5">STATUS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.sports.map((s) => (
+              <tr key={s.sportCode} className="border-b border-border/50">
+                <td className="py-1.5 pr-4 font-semibold text-foreground">{s.sportCode}</td>
+                <td className="py-1.5 pr-4 text-muted-foreground">{s.corpusGames.toLocaleString()}</td>
+                <td className="py-1.5 pr-4 text-muted-foreground">{s.v2?.trainedGames.toLocaleString() ?? "—"}</td>
+                <td className="py-1.5 pr-4 text-muted-foreground">{s.v2?.gamesEvaluated.toLocaleString() ?? "—"}</td>
+                <td className="py-1.5 pr-4 text-muted-foreground">{s.v1 ? s.v1.brier.toFixed(4) : "—"}</td>
+                <td className="py-1.5 pr-4 text-muted-foreground">{s.v2 ? s.v2.brier.toFixed(4) : "—"}</td>
+                <td className="py-1.5">
+                  {!s.v2 ? (
+                    <span className="text-muted-foreground">NOT EVALUATED</span>
+                  ) : s.deployed ? (
+                    <span className="text-pos">V2 DEPLOYED</span>
+                  ) : (
+                    <span className="text-warn">V1 RETAINED</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function Sports() {
   const { data } = trpc.models.list.useQuery();
 
@@ -49,6 +101,7 @@ export default function Sports() {
         title="Sport coverage"
         sub="Eleven sport-specific quantitative models — each with its own features, ensemble weights, calibration and backtests. Select a model for full detail."
       />
+      <UpgradeReport />
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {(data ?? []).map((m) => (
           <Link
