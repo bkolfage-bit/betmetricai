@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { Lock, Sparkles } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { EmptyState, SectionHead, StatusBadge } from "@/components/bits";
+import { Seo } from "@/components/Seo";
 import { ProTeaser } from "@/components/ProTeaser";
 import { useSportFilter } from "@/providers/sport-filter";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,6 +25,8 @@ export default function PlusEV() {
 
   return (
     <div className="flex flex-col gap-6">
+    <Seo title="+EV Betting Opportunities — AI Value Screen" description="Live +EV betting opportunities: our AI compares predicted outcomes against real-time sportsbook odds to surface potentially undervalued bets, ranked by expected value." path="/ev" />
+
       <SectionHead
         title="+EV opportunities"
         sub="Our proprietary AI analyzes thousands of data points and compares predicted outcomes against real-time sportsbook odds to uncover potentially undervalued bets. Each +EV opportunity is ranked by its estimated long-term value, helping you find where the numbers suggest an edge over Vegas."

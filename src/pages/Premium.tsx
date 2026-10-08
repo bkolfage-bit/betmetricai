@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { SectionHead } from "@/components/bits";
+import { Seo } from "@/components/Seo";
 import { cn } from "@/lib/utils";
 import { BadgeCheck, Check, Minus, Sparkles } from "lucide-react";
 
@@ -55,6 +56,8 @@ export default function Premium() {
   const isPro = user?.plan === "pro" || user?.role === "admin";
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-10">
+    <Seo title="Go Pro — Unlock the Full Terminal" description="Unlock unlimited AI picks, player props, the +EV screen, AI parlay builder, bet tracker and AI assistant — $19.99/month or $199/year." path="/premium" />
+
       {isPro ? (
         <div className="panel flex flex-wrap items-center justify-between gap-4 rounded-sm border-[#34d399]/40 p-5">
           <div className="flex items-start gap-3">

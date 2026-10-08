@@ -1,5 +1,6 @@
 import { trpc } from "@/providers/trpc";
 import { SectionHead, Sparkline } from "@/components/bits";
+import { Seo } from "@/components/Seo";
 import { useSportFilter } from "@/providers/sport-filter";
 import { fmtOdds, fmtTime, num, pct, signedPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,8 @@ export default function Performance() {
 
   return (
     <div className="flex flex-col gap-8">
+    <Seo title="AI Performance — Full Transparency" description="Our complete audited track record: win rate, ROI, units, closing line value and every graded pick — wins and losses, never restated." path="/performance" />
+
       <SectionHead
         title="AI performance — full transparency"
         sub="Every graded pick is auditable. Losing picks are never hidden, records are never restated."

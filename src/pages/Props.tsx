@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { useSportFilter } from "@/providers/sport-filter";
 import { EmptyState, SectionHead } from "@/components/bits";
+import { Seo } from "@/components/Seo";
 import { ProTeaser } from "@/components/ProTeaser";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,8 @@ export default function Props() {
 
   return (
     <div className="flex flex-col gap-6">
+    <Seo title="AI Player Props — Projections vs Sportsbook Lines" description="AI player prop analysis: points, yards, strikeouts and more — our projections compared against sportsbook lines with edge scores and expected value." path="/props" />
+
       <SectionHead
         title="Player props"
         sub="Individual player stat lines — points, yards, strikeouts and more — compared against our AI's projection for that player. Only markets with enough reliable player data are shown."

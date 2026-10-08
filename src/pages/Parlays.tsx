@@ -2,6 +2,7 @@ import { useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { useSportFilter } from "@/providers/sport-filter";
 import { SectionHead } from "@/components/bits";
+import { Seo } from "@/components/Seo";
 import { ProGate } from "@/components/ProTeaser";
 import { useAuth } from "@/hooks/useAuth";
 import { fmtOdds, pct, signedPct } from "@/lib/format";
@@ -25,6 +26,8 @@ export default function Parlays() {
   if (!isLoading && !isPro) {
     return (
       <div className="flex flex-col gap-6">
+      <Seo title="AI Parlay Builder — True Combined Probability" description="Build multi-leg parlays from today's strongest AI value picks with true combined win probability and expected return calculated for every ticket." path="/parlays" />
+
         <SectionHead
           title="AI parlay builder"
           sub="Multi-leg combinations built from today's strongest value picks. We calculate the true combined win probability and expected return of every ticket — so you can see exactly what you're risking."

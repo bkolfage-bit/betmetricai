@@ -3,6 +3,7 @@ import { trpc } from "@/providers/trpc";
 import { useSportFilter } from "@/providers/sport-filter";
 import { useAuth } from "@/hooks/useAuth";
 import { EdgeDial, SectionHead, Sparkline, StatusBadge } from "@/components/bits";
+import { Seo } from "@/components/Seo";
 import { PickCard, selectionLabel } from "@/components/PickCard";
 import { Testimonials } from "@/components/Testimonials";
 import { fmtLine, fmtOdds, num, pct, signedPct, timeAgo } from "@/lib/format";
@@ -90,6 +91,8 @@ export default function Home() {
 
   return (
     <div className="flex flex-col gap-14">
+    <Seo title="BetMetricAi — AI Sports Betting Intelligence, Picks & +EV Analysis" description="AI-powered sports betting intelligence: live sportsbook odds, AI picks ranked by Edge Score, +EV value analysis, player props, line movement and a fully transparent track record." path="/" />
+
       {/* HERO */}
       <section className="grid items-center gap-8 pt-4 lg:grid-cols-[1.2fr_1fr] lg:pt-10">
         <div className="animate-fade-up">

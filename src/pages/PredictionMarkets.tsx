@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { EmptyState, SectionHead } from "@/components/bits";
+import { Seo } from "@/components/Seo";
 import { useSportFilter } from "@/providers/sport-filter";
 import { fmtTime, pct } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -283,6 +284,8 @@ export default function PredictionMarkets() {
 
   return (
     <div className="flex flex-col gap-8">
+    <Seo title="Prediction Markets vs Sportsbooks" description="Live Kalshi and Polymarket prediction market prices compared side-by-side with sportsbook odds and our AI's independent estimate." path="/markets" />
+
       <SectionHead
         title="Prediction market intelligence"
         sub="See what real money is saying: live prices from the Kalshi and Polymarket prediction markets — where traders bet actual dollars on outcomes — compared side-by-side with sportsbook odds and our AI's independent estimate. Analytics only: this platform never trades and never takes wagers."

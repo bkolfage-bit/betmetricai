@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { SectionHead } from "@/components/bits";
+import { Seo } from "@/components/Seo";
 import {
   ArrowRight,
   Brain,
@@ -56,6 +57,8 @@ export default function About() {
   const isPro = user?.plan === "pro" || user?.role === "admin";
   return (
     <div className="flex flex-col gap-14">
+    <Seo title="About BetMetricAi — How the Models Work" description="How BetMetricAi works: sport-specific AI models, thousands of simulations per game, fair odds with the vig removed, and a transparent public track record." path="/about" />
+
       {/* HERO — level the playing field */}
       <section className="max-w-3xl pt-4">
         <p className="label-caps mb-4 flex items-center gap-2">

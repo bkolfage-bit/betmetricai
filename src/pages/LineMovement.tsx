@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { EmptyState, SectionHead } from "@/components/bits";
+import { Seo } from "@/components/Seo";
 import { useSportFilter } from "@/providers/sport-filter";
 import { fmtLine, fmtOdds, fmtTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -100,6 +101,8 @@ export default function LineMovement() {
 
   return (
     <div className="flex flex-col gap-6">
+    <Seo title="Line Movement Tracker — Odds History" description="Track how sportsbook odds and lines move from open to game time across NFL, NBA, MLB, NHL and more — full price history on every market." path="/line-movement" />
+
       <SectionHead
         title="Line movement"
         sub="Watch how odds and lines move from open to game time. Sharp movement often signals where the smart money went — and every historical price is stored, never rewritten."

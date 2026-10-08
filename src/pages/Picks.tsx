@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { PickCard } from "@/components/PickCard";
+import { Seo } from "@/components/Seo";
 import { useSportFilter } from "@/providers/sport-filter";
 import { EmptyState, SectionHead } from "@/components/bits";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,8 @@ export default function Picks() {
 
   return (
     <div className="flex flex-col gap-6">
+      <Seo title="Today's AI Picks — Ranked by Edge Score" description="Today's AI sports picks ranked by Edge Score — every pick shows our AI's win probability vs the sportsbook's price, the best available odds, and a full version history." path="/picks" />
+
       <SectionHead
         title="AI Picks"
         sub="Our AI's best positions right now, ranked by how strongly the numbers disagree with the sportsbook's price. Every pick updates as odds move — and its full history stays visible."
