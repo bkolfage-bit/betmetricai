@@ -8,6 +8,7 @@ import { trackerRouter } from "./routers/tracker";
 import { parlaysRouter, adminRouter } from "./routers/parlays";
 import { modelsRouter } from "./routers/models";
 import { feedRouter } from "./routers/feed";
+import { pmarketsRouter } from "./routers/pmarkets";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -22,6 +23,7 @@ export const appRouter = createRouter({
   admin: adminRouter,
   models: modelsRouter,
   feed: feedRouter,
+  pmarkets: pmarketsRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -484,3 +484,66 @@ export const closingLines = mysqlTable("closing_lines", {
   odds: int("odds").notNull(),
   capturedAt: timestamp("capturedAt").defaultNow().notNull(),
 });
+
+/* ----------------- prediction-market intelligence (read-only) ----------------- */
+
+/**
+ * A prediction-market event (Kalshi or Polymarket) matched, where possible,
+ * to a first-class `events` row from the sportsbook feed. Everything in
+ * these tables is PUBLIC market data fetched from free read-only endpoints —
+ * no credentials, no trading, no order execution.
+ */
+export const pmEvents = mysqlTable("pm_events", {
+  id: serial("id").primaryKey(),
+  venue: mysqlEnum("venue", ["KALSHI", "POLYMARKET"]).notNull(),
+  sportCode: varchar("sportCode", { length: 16 }).notNull(),
+  /** venue-native identity: Kalshi event_ticker / Polymarket event slug */
+  venueEventId: varchar("venueEventId", { length: 191 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  homeTeam: varchar("homeTeam", { length: 128 }),
+  awayTeam: varchar("awayTeam", { length: 128 }),
+  startTime: timestamp("startTime"),
+  /** matched events.id (plain column — prediction markets must never
+   *  constrain the sportsbook pipeline) */
+  eventId: bigint("eventId", { mode: "number", unsigned: true }),
+  status: varchar("status", { length: 16 }).default("open").notNull(), // open | closed
+  url: varchar("url", { length: 255 }),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+/** One outcome side of a prediction-market contract, normalized. */
+export const pmMarkets = mysqlTable("pm_markets", {
+  id: serial("id").primaryKey(),
+  pmEventId: bigint("pmEventId", { mode: "number", unsigned: true })
+    .notNull()
+    .references(() => pmEvents.id),
+  /** venue-native market id: Kalshi market ticker / Polymarket condition id */
+  venueMarketId: varchar("venueMarketId", { length: 191 }).notNull(),
+  market: mysqlEnum("market", ["moneyline", "spread", "total"]).notNull(),
+  selection: varchar("selection", { length: 16 }).notNull(), // home | away | draw | over | under
+  line: decimal("line", { precision: 8, scale: 2 }),
+  /** normalized 0..1 pricing for THIS selection */
+  bid: decimal("bid", { precision: 8, scale: 6 }),
+  ask: decimal("ask", { precision: 8, scale: 6 }),
+  mid: decimal("mid", { precision: 8, scale: 6 }),
+  lastPrice: decimal("lastPrice", { precision: 8, scale: 6 }),
+  volume: decimal("volume", { precision: 16, scale: 2 }),
+  volume24h: decimal("volume24h", { precision: 16, scale: 2 }),
+  liquidity: decimal("liquidity", { precision: 16, scale: 2 }),
+  /** Polymarket CLOB token id for this side (price-history lookups) */
+  tokenId: varchar("tokenId", { length: 96 }),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+/** Append-only prediction-market price history (feeds the trend charts). */
+export const pmPriceSnapshots = mysqlTable("pm_price_snapshots", {
+  id: serial("id").primaryKey(),
+  pmMarketId: bigint("pmMarketId", { mode: "number", unsigned: true })
+    .notNull()
+    .references(() => pmMarkets.id),
+  mid: decimal("mid", { precision: 8, scale: 6 }).notNull(),
+  bid: decimal("bid", { precision: 8, scale: 6 }),
+  ask: decimal("ask", { precision: 8, scale: 6 }),
+  volume: decimal("volume", { precision: 16, scale: 2 }),
+  capturedAt: timestamp("capturedAt").defaultNow().notNull(),
+});

@@ -23,6 +23,7 @@ import {
   syncScores,
   syncSportOdds,
 } from "./service";
+import { syncPredictionMarkets } from "../pm/service";
 
 const TICK_MS = 30_000;
 const WINDOW_AHEAD_MS = 30 * 60 * 60 * 1000; // poll nothing beyond 30h out
@@ -31,8 +32,10 @@ const MAX_EVENTS_PER_CALL = 20;
 const HORIZON_MS = FORECAST_HORIZON_DAYS * 24 * 60 * 60 * 1000;
 const OUTRIGHTS_INTERVAL_MS = 24 * 60 * 60 * 1000; // futures move slowly
 const SCORES_INTERVAL_MS = 5 * 60 * 1000; // /scores: 1 credit per sport-key
+const PM_INTERVAL_MS = 10 * 60 * 1000; // prediction markets: free public APIs
 let lastOutrightsRun = 0;
 let lastScoresRun = 0;
+let lastPmRun = 0;
 
 interface TierDef {
   maxAheadMs: number;
@@ -132,6 +135,24 @@ async function tick(): Promise<void> {
               (r.errors.length ? ` ERRORS: ${r.errors.join("; ")}` : ""),
           );
         }
+      }
+    }
+
+    // prediction-market intelligence pass: free public APIs (no quota cost),
+    // every 10 min, isolated from the odds pipeline
+    if (now - lastPmRun >= PM_INTERVAL_MS) {
+      lastPmRun = now;
+      const pm = await syncPredictionMarkets().catch((e) => {
+        console.error("[pm] sync crashed:", e instanceof Error ? e.message : e);
+        return null;
+      });
+      if (pm) {
+        console.log(
+          `[pm] kalshi ${pm.kalshi.events}ev/${pm.kalshi.matched}matched · polymarket ${pm.polymarket.events}ev/${pm.polymarket.matched}matched · history +${pm.historySeeded} · closed ${pm.closed}` +
+            (pm.kalshi.errors.length || pm.polymarket.errors.length
+              ? ` ERRORS: ${[...pm.kalshi.errors, ...pm.polymarket.errors].join("; ").slice(0, 300)}`
+              : ""),
+        );
       }
     }
 

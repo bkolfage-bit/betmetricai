@@ -13,6 +13,7 @@ import ModelDetail from "./pages/ModelDetail";
 import Assistant from "./pages/Assistant";
 import Tracker from "./pages/Tracker";
 import Performance from "./pages/Performance";
+import PredictionMarkets from "./pages/PredictionMarkets";
 import Premium from "./pages/Premium";
 import Account from "./pages/Account";
 import Admin from "./pages/Admin";
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/assistant" element={<Assistant />} />
         <Route path="/tracker" element={<Tracker />} />
         <Route path="/performance" element={<Performance />} />
+        <Route path="/markets" element={<PredictionMarkets />} />
         <Route path="/premium" element={<Premium />} />
         <Route path="/about" element={<About />} />
         <Route path="/account" element={<Account />} />

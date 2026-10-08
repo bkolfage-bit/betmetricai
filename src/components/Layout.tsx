@@ -21,6 +21,7 @@ import {
   LayoutGrid,
   LogIn,
   Radio,
+  Scale,
   Shield,
   Sparkles,
   Target,
@@ -37,6 +38,7 @@ const NAV_BASE = [
   { to: "/props", label: "PROPS" },
   { to: "/parlays", label: "PARLAYS" },
   { to: "/line-movement", label: "LINE MOVEMENT" },
+  { to: "/markets", label: "PRED MKTS" },
   { to: "/sports", label: "SPORTS" },
   { to: "/assistant", label: "AI ASSISTANT" },
   { to: "/tracker", label: "BET TRACKER" },
@@ -69,6 +71,7 @@ const MOBILE_MENU_SECTIONS = [
       { to: "/live", label: "Live Scores & Odds", icon: Radio, pro: false },
       { to: "/ev", label: "+EV Opportunities", icon: Activity, pro: false },
       { to: "/sports", label: "Sports & Models", icon: Trophy, pro: false },
+      { to: "/markets", label: "Prediction Markets", icon: Scale, pro: false },
     ],
   },
   {
