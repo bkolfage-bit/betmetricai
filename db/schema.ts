@@ -356,6 +356,30 @@ export const savedPicks = mysqlTable("saved_picks", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+/**
+ * Customer testimonials — admin-moderated reviews.
+ * Submissions arrive as "pending" and are invisible to the public until an
+ * administrator approves them. `verified` marks a confirmed customer;
+ * `featured` pins a review to the front of the homepage carousel.
+ * The 26 illustrative homepage examples live ONLY in frontend code — they
+ * are never seeded into this table and never become "real" reviews.
+ */
+export const testimonials = mysqlTable("testimonials", {
+  id: serial("id").primaryKey(),
+  userId: bigint("userId", { mode: "number", unsigned: true })
+    .notNull()
+    .references(() => users.id),
+  displayName: varchar("displayName", { length: 64 }).notNull(),
+  rating: int("rating").notNull(), // 1–5 stars, exactly as submitted
+  text: varchar("text", { length: 1000 }).notNull(),
+  status: mysqlEnum("status", ["pending", "approved", "rejected"])
+    .default("pending")
+    .notNull(),
+  verified: int("verified").default(0).notNull(),
+  featured: int("featured").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export const userBets = mysqlTable("user_bets", {
   id: serial("id").primaryKey(),
   userId: bigint("userId", { mode: "number", unsigned: true })

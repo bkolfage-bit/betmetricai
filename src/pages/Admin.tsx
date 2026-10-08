@@ -421,6 +421,90 @@ function UserManagement({ currentUserId }: { currentUserId: number }) {
   );
 }
 
+/**
+ * Testimonial moderation queue — approve/reject/feature/verify real customer
+ * reviews. Review text and star ratings are displayed exactly as submitted
+ * and are never editable here; moderation only controls publication state.
+ * The illustrative homepage samples live in frontend code and never appear
+ * in this queue.
+ */
+function TestimonialModeration() {
+  const utils = trpc.useUtils();
+  const { data } = trpc.testimonials.adminList.useQuery(undefined, {
+    refetchInterval: 30000,
+  });
+  const moderate = trpc.testimonials.moderate.useMutation({
+    onSuccess: () => utils.testimonials.adminList.invalidate(),
+  });
+  const reviews = data?.reviews ?? [];
+  const pendingCount = reviews.filter((r) => r.status === "pending").length;
+
+  const btn = (label: string, onClick: () => void, cls: string) => (
+    <button
+      key={label}
+      onClick={onClick}
+      className={cn("min-h-[32px] rounded-sm border px-2.5 font-mono2 text-[9px] font-bold tracking-[0.1em]", cls)}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <section className="panel overflow-hidden rounded-sm">
+      <p className="label-caps border-b border-border px-4 py-3">
+        Customer reviews — moderation queue
+        {pendingCount > 0 && <span className="ml-2 text-warn">{pendingCount} pending</span>}
+      </p>
+      {reviews.length === 0 && (
+        <p className="px-4 py-6 text-center font-mono2 text-xs text-muted-foreground">
+          No customer reviews yet. The homepage currently shows the clearly-labeled
+          illustrative examples — approved reviews will replace them automatically.
+        </p>
+      )}
+      <div className="divide-y divide-border">
+        {reviews.map((r) => (
+          <div key={r.id} className="flex flex-col gap-2 px-4 py-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono2 text-[10px]">
+              <span className="font-bold text-foreground">{r.displayName}</span>
+              <span className="text-[#fbbf24]">{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</span>
+              <span
+                className={cn(
+                  "rounded-sm border px-1.5 py-0.5 font-bold uppercase tracking-[0.1em]",
+                  r.status === "approved"
+                    ? "border-[#34d399]/40 text-pos"
+                    : r.status === "rejected"
+                      ? "border-[#f87171]/40 text-neg"
+                      : "border-warn/40 text-warn",
+                )}
+              >
+                {r.status}
+              </span>
+              {r.verified === 1 && <span className="text-pos">VERIFIED</span>}
+              {r.featured === 1 && <span className="text-primary">FEATURED</span>}
+              <span className="text-muted-foreground">{r.email}</span>
+              <span className="text-muted-foreground">{timeAgo(r.createdAt)}</span>
+            </div>
+            <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">"{r.text}"</p>
+            <div className="flex flex-wrap gap-1.5">
+              {r.status !== "approved" &&
+                btn("APPROVE", () => moderate.mutate({ id: r.id, action: "approve" }), "border-[#34d399]/40 text-pos")}
+              {r.status !== "rejected" &&
+                btn("REJECT", () => moderate.mutate({ id: r.id, action: "reject" }), "border-[#f87171]/40 text-neg")}
+              {r.status === "approved" &&
+                (r.featured === 1
+                  ? btn("UNFEATURE", () => moderate.mutate({ id: r.id, action: "unfeature" }), "border-border text-muted-foreground")
+                  : btn("FEATURE", () => moderate.mutate({ id: r.id, action: "feature" }), "border-primary/40 text-primary"))}
+              {r.verified === 1
+                ? btn("UNVERIFY", () => moderate.mutate({ id: r.id, action: "unverify" }), "border-border text-muted-foreground")
+                : btn("VERIFY", () => moderate.mutate({ id: r.id, action: "verify" }), "border-[#34d399]/40 text-pos")}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function Admin() {
   const { user, isLoading } = useAuth();
   const { data, refetch } = trpc.admin.stats.useQuery(undefined, {
@@ -610,6 +694,9 @@ export default function Admin() {
           ))}
         </div>
       </section>
+
+      {/* testimonial moderation */}
+      <TestimonialModeration />
 
       {/* system logs */}
       <section className="panel overflow-hidden rounded-sm">

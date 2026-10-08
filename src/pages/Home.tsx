@@ -4,6 +4,7 @@ import { useSportFilter } from "@/providers/sport-filter";
 import { useAuth } from "@/hooks/useAuth";
 import { EdgeDial, SectionHead, Sparkline, StatusBadge } from "@/components/bits";
 import { PickCard, selectionLabel } from "@/components/PickCard";
+import { Testimonials } from "@/components/Testimonials";
 import { fmtLine, fmtOdds, num, pct, signedPct, timeAgo } from "@/lib/format";
 import { ArrowRight, Brain, Database, Gauge, Radio, RefreshCw, Sigma } from "lucide-react";
 
@@ -350,6 +351,9 @@ export default function Home() {
           </>
         )}
       </section>
+
+      {/* CUSTOMER TESTIMONIALS — directly above the footer */}
+      <Testimonials />
     </div>
   );
 }
