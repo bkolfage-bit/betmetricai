@@ -166,10 +166,31 @@ export default function Performance() {
         </table>
       </section>
 
-      <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
-        * Historical results are graded against closing lines and stored with full
-        timestamps. Past performance never guarantees future results.
-      </p>
+      <div className="flex flex-col gap-1.5">
+        <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
+          * How to read these numbers: UNITS show total profit measured in flat
+          one-unit stakes (one unit = your normal bet size), so results are
+          comparable no matter how big each bet was. ROI is profit as a
+          percentage of the total amount staked. WIN RATE counts wins and
+          losses only — pushes (ties/refunds) are excluded.
+        </p>
+        <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
+          * CLV (Closing Line Value) measures whether our pick got a better
+          price than the final odds right before the game started — the
+          "closing line" is widely considered the sharpest price the market
+          produces. AVG CLV is the average amount we beat that price by, and
+          +CLV RATE is how often we beat it. Consistently positive CLV is the
+          strongest single sign of a real, lasting edge — even more than
+          short-term win rate.
+        </p>
+        <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
+          * MAX DRAWDOWN is the largest peak-to-trough drop the units curve
+          has ever taken — a realistic picture of the worst losing stretch a
+          follower would have lived through. Historical results are graded
+          against closing lines and stored with full timestamps. Past
+          performance never guarantees future results.
+        </p>
+      </div>
     </div>
   );
 }

@@ -45,7 +45,11 @@ function SettledCard({ row }: { row: SavedRow }) {
               <Icon className="h-3.5 w-3.5" /> {meta.label}
             </span>
             <p className={cn("mt-1 text-[10px] tabular-nums", parseFloat(g.units) >= 0 ? "text-pos" : "text-neg")}>
-              {parseFloat(g.units) >= 0 ? "+" : ""}{parseFloat(g.units).toFixed(2)}u · CLV {signedPct(parseFloat(g.clv) / 100)}
+              {parseFloat(g.units) >= 0 ? "+" : ""}{parseFloat(g.units).toFixed(2)}u
+              {" · "}
+              {parseFloat(g.clv) >= 0
+                ? `beat the close by ${signedPct(parseFloat(g.clv) / 100).replace("+", "")}`
+                : `missed the close by ${signedPct(parseFloat(g.clv) / 100).replace("-", "")}`}
             </p>
           </div>
           <SaveButton pickId={row.pick.id} />

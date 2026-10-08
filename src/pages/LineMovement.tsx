@@ -16,7 +16,7 @@ function LineChart({
   const H = 260;
   const PAD = { l: 44, r: 14, t: 16, b: 28 };
   const values = points.map((p) => (isMoneyline ? p.odds : (p.line ?? 0)));
-  if (values.length < 2) return <EmptyState title="Not enough history yet" hint="Snapshots accumulate as the market moves — historical odds are never overwritten." />;
+  if (values.length < 2) return <EmptyState title="Not enough history yet" hint="Price history builds automatically as the market moves — check back closer to game time." />;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = max - min || 1;
@@ -102,7 +102,7 @@ export default function LineMovement() {
     <div className="flex flex-col gap-6">
       <SectionHead
         title="Line movement"
-        sub="Consensus line history from stored snapshots. Historical odds are never overwritten — every price is auditable."
+        sub="Watch how odds and lines move from open to game time. Sharp movement often signals where the smart money went — and every historical price is stored, never rewritten."
       />
 
       <div className="flex flex-wrap gap-3">

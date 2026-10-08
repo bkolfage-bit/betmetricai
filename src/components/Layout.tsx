@@ -417,8 +417,8 @@ export default function Layout() {
           <div>
             <Logo />
             <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-              Real-time sportsbook odds, quantitative predictions, expected-value
-              analysis and AI betting intelligence. The pick changes when the
+              Real-time sportsbook odds, AI predictions and expected-value
+              analysis explained in plain English. The pick changes when the
               market changes.
             </p>
           </div>
@@ -458,7 +458,7 @@ export default function Layout() {
         <div className="hairline-t mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-2 px-5 py-4">
           <p className="font-mono2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
             © 2026 BetMetricAi · Odds: The Odds API (production feed) ·
-            Predictions: quantitative models
+            Predictions: our AI models
           </p>
           <p className="font-mono2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
             Prediction ≠ betting value

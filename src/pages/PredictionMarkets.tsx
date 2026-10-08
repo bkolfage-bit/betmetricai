@@ -64,7 +64,7 @@ function TrendChart({ eventId, model, book }: { eventId: number; model: number |
     return (
       <EmptyState
         title="History accumulating"
-        hint="Price snapshots are appended every sync — the trend appears as the market trades. Polymarket markets are backfilled from public CLOB history."
+        hint="Price history builds automatically as traders buy and sell — the trend chart appears once enough trades have been recorded."
       />
     );
   }
@@ -128,7 +128,7 @@ function TrendChart({ eventId, model, book }: { eventId: number; model: number |
         {book !== null && (
           <span className="flex items-center gap-1.5">
             <span className="inline-block h-[2px] w-4 border-t border-dotted border-muted-foreground" />
-            SPORTSBOOK NO-VIG
+            SPORTSBOOKS (FAIR ODDS)
           </span>
         )}
       </div>
@@ -166,7 +166,7 @@ function Row({ row }: { row: BoardRow }) {
               </div>
             </div>
             <div>
-              <div className="font-mono2 text-[9px] tracking-wider text-muted-foreground">BOOKS NO-VIG</div>
+              <div className="font-mono2 text-[9px] tracking-wider text-muted-foreground">SPORTSBOOKS</div>
               <div className="flex gap-3">
                 {row.book ? (
                   <>
@@ -285,7 +285,7 @@ export default function PredictionMarkets() {
     <div className="flex flex-col gap-8">
       <SectionHead
         title="Prediction market intelligence"
-        sub="Kalshi and Polymarket public prices vs sportsbook no-vig consensus vs our independent AI models. Read-only analytics — this platform does not trade or take wagers."
+        sub="See what real money is saying: live prices from the Kalshi and Polymarket prediction markets — where traders bet actual dollars on outcomes — compared side-by-side with sportsbook odds and our AI's independent estimate. Analytics only: this platform never trades and never takes wagers."
       />
 
       {/* source attribution + venue health */}
@@ -313,7 +313,7 @@ export default function PredictionMarkets() {
         })}
         <div className="panel rounded-sm p-4">
           <div className="font-mono2 text-[10px] font-semibold tracking-wider text-muted-foreground">SPORTSBOOK FEED</div>
-          <div className="mt-2 font-mono2 text-[10px] text-muted-foreground">The Odds API · no-vig consensus</div>
+          <div className="mt-2 font-mono2 text-[10px] text-muted-foreground">The Odds API · fair odds (margin removed)</div>
         </div>
         <div className="panel rounded-sm p-4">
           <div className="flex items-center gap-1.5 font-mono2 text-[10px] font-semibold tracking-wider text-cyan-400">
@@ -334,7 +334,7 @@ export default function PredictionMarkets() {
         {data && data.rows.length === 0 && (
           <EmptyState
             title="No matched prediction markets right now"
-            hint="The sync pulls public Kalshi and Polymarket sports markets every 10 minutes and matches them to games on the sportsbook feed. Matched markets appear here automatically."
+            hint="We check Kalshi and Polymarket every 10 minutes for sports markets and automatically match them to games on our odds feed. Matched markets appear here as soon as they're found."
           />
         )}
         {data?.rows.map((r) => <Row key={r.eventId} row={r} />)}
@@ -342,9 +342,9 @@ export default function PredictionMarkets() {
 
       <div className="rounded-sm border border-border/60 bg-muted/10 p-4 font-mono2 text-[10px] leading-relaxed text-muted-foreground">
         INFORMATIONAL ANALYTICS ONLY. Prediction-market prices are public market data from Kalshi (api.elections.kalshi.com) and Polymarket
-        (gamma-api.polymarket.com / clob.polymarket.com), normalized to implied probabilities. EV figures are estimates after estimated transaction
-        costs (venue fee schedules and bid/ask spread) and describe price discrepancies — they are not betting, trading, or investment advice.
-        BetMetric AI does not execute trades or wagers and is not affiliated with Kalshi or Polymarket.
+        (gamma-api.polymarket.com / clob.polymarket.com), converted into win probabilities so they can be compared side-by-side. EV figures are
+        estimates after estimated transaction costs (each venue's fees and the gap between buy and sell prices) and describe price differences —
+        they are not betting, trading, or investment advice. BetMetric AI does not execute trades or wagers and is not affiliated with Kalshi or Polymarket.
       </div>
     </div>
   );

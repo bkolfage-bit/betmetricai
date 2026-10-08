@@ -16,17 +16,17 @@ import {
 } from "lucide-react";
 
 const AI_EDGE_SIGNALS = [
-  "MODEL PROBABILITY",
-  "SPORTSBOOK IMPLIED PROBABILITY",
-  "NO-VIG MARKET PROBABILITY",
+  "OUR AI'S WIN PROBABILITY",
+  "PROBABILITY IMPLIED BY THE ODDS",
+  "FAIR ODDS (MARGIN REMOVED)",
   "EXPECTED VALUE",
   "MODEL AGREEMENT",
-  "PRICE QUALITY",
+  "HOW GOOD THE PRICE IS",
   "LINE MOVEMENT",
   "INJURY & LINEUP CERTAINTY",
   "DATA FRESHNESS",
-  "MODEL CALIBRATION",
-  "MARKET VOLATILITY",
+  "TRACK RECORD OF OUR PROBABILITIES",
+  "HOW FAST THE MARKET IS MOVING",
 ];
 
 const MARKET_TRIGGERS = [
@@ -57,8 +57,8 @@ const TRACKED_METRICS = [
   "Win/loss/push record",
   "Return on investment",
   "Units won or lost",
-  "Closing line value",
-  "Calibration",
+  "Whether our prices beat the closing line",
+  "How closely our probabilities match reality",
   "Performance by sport",
   "Performance by market",
   "Performance by AI Edge range",
@@ -75,7 +75,7 @@ export default function About() {
           <Scale className="h-3.5 w-3.5 text-primary" /> Built to level the playing field
         </p>
         <h1 className="text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl">
-          ADVANCED QUANTITATIVE INTELLIGENCE.
+          SERIOUS SPORTS ANALYTICS.
           <br />
           <span className="text-primary" style={{ textShadow: "0 0 24px rgba(34,211,238,0.4)" }}>
             BUILT FOR BETTORS.
@@ -90,15 +90,14 @@ export default function About() {
           We believe bettors should have access to powerful analytical tools too.
         </p>
         <p className="mt-4 text-sm leading-relaxed text-muted-foreground sm:text-base">
-          Our proprietary AI modeling platform combines advanced statistical
-          analysis, machine learning, simulation, real-time sportsbook pricing,
-          historical performance data, player and team analytics, injuries,
-          lineups, weather, market movement, and other relevant variables to
-          evaluate betting markets from thousands of angles.
+          Our AI platform crunches everything that moves a betting line — team
+          and player form, injuries, lineups, weather, live sportsbook prices
+          and market movement — and evaluates every game from thousands of
+          angles.
         </p>
         <p className="mt-6 border-l-2 border-primary pl-4 text-base font-bold leading-relaxed sm:text-lg">
-          The objective is simple: bring institutional-grade sports analytics to
-          everyday bettors and help level the analytical playing field.
+          The objective is simple: give everyday bettors the same caliber of
+          analysis the professionals use — and level the playing field.
         </p>
       </section>
 
@@ -106,31 +105,31 @@ export default function About() {
       <section>
         <SectionHead
           title="More than an AI pick generator"
-          sub="Our system doesn't simply ask an AI which team will win. Behind every recommendation is a quantitative modeling infrastructure designed specifically for sports and betting markets."
+          sub="Our system doesn't simply ask an AI which team will win. Behind every recommendation is a purpose-built math engine designed specifically for sports and betting markets."
         />
         <div className="panel rounded-sm p-6 sm:p-8">
-          <p className="label-caps mb-4">Depending on the sport and market, the framework can incorporate</p>
+          <p className="label-caps mb-4">Depending on the sport and market, the engine can use</p>
           <div className="grid gap-x-8 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
             {[
-              "Machine-learning models",
-              "Statistical regression models",
-              "Bayesian modeling",
-              "Elo and dynamic team/player ratings",
-              "Monte Carlo simulation",
-              "Sport-specific probability models",
+              "Machine learning that improves with every result",
+              "Statistical models tuned on years of results",
+              "Ratings that update as new information arrives",
+              "Team and player strength ratings",
+              "Thousands of simulated replays of each game",
+              "Win-probability models built for each sport",
               "Player-level projections",
-              "Team efficiency models",
+              "Team efficiency ratings",
               "Injury and lineup adjustments",
               "Weather and venue effects",
               "Real-time sportsbook odds",
-              "Market-implied probabilities",
-              "No-vig market probabilities",
+              "Win probabilities implied by the odds",
+              "Fair odds with the book's margin stripped out",
               "Line movement",
-              "Expected-value calculations",
-              "Probability calibration",
-              "Model agreement",
-              "Historical backtesting",
-              "Closing-line-value analysis",
+              "Expected value on every bet",
+              "Checks that our probabilities match reality",
+              "Agreement across independent models",
+              "Testing against years of past results",
+              "Whether our prices beat the closing line",
             ].map((x) => (
               <p key={x} className="flex items-center gap-2 font-mono2 text-[11px] text-muted-foreground">
                 <span className="text-primary">+</span> {x}
@@ -153,11 +152,10 @@ export default function About() {
             BUILT FOR THE OTHER SIDE OF THE BET.
           </h3>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            Professional sportsbooks and sophisticated quantitative betting
-            operations rely on data, probability, statistical modeling and
-            market intelligence when evaluating betting markets. Our technology
-            brings many of those same classes of analytical techniques together
-            into one proprietary platform designed for bettors.
+            Professional sportsbooks and professional betting syndicates rely
+            on data, probability and statistical modeling to set and beat
+            betting markets. Our technology brings many of those same
+            techniques together into one platform designed for bettors.
           </p>
         </div>
         <div className="flex flex-col justify-center gap-5 bg-secondary p-6 sm:p-8">
@@ -179,7 +177,7 @@ export default function About() {
             </p>
           </div>
           <p className="font-mono2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-            That distinction is at the heart of quantitative sports betting.
+            That distinction is at the heart of betting with an edge.
           </p>
         </div>
       </section>
@@ -264,14 +262,15 @@ export default function About() {
       <section className="grid gap-px overflow-hidden rounded-sm border border-border bg-border lg:grid-cols-2">
         <div className="bg-card p-6 sm:p-8">
           <p className="label-caps mb-2 flex items-center gap-2">
-            <Dices className="h-3.5 w-3.5 text-primary" /> Monte Carlo engine
+            <Dices className="h-3.5 w-3.5 text-primary" /> Simulation engine
           </p>
           <h3 className="text-2xl font-extrabold tracking-tight">10,000 SIMULATIONS. ONE DECISION.</h3>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            Where appropriate, our models run thousands of simulations of an
-            event to estimate the distribution of possible outcomes rather than
-            relying on a single predicted score. We then compare that
-            probability against the price available in the sportsbook market.
+            Where appropriate, our models play out the same game thousands of
+            times with slightly different bounces each run, so instead of one
+            predicted score we get the full range of ways the game could go.
+            We then compare that probability against the price available in
+            the sportsbook market.
           </p>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
             That's where prediction becomes{" "}
@@ -279,7 +278,7 @@ export default function About() {
           </p>
         </div>
         <div className="flex flex-col justify-center gap-3 bg-secondary p-6 font-mono2 text-xs sm:p-8">
-          <p className="label-caps mb-1">Example — 10,000 Monte Carlo simulations</p>
+          <p className="label-caps mb-1">Example — the same game simulated 10,000 times</p>
           {[
             ["TEAM A WINS", "6,180", "text-pos"],
             ["TEAM B WINS", "3,820", "text-muted-foreground"],
@@ -300,11 +299,11 @@ export default function About() {
       <section>
         <SectionHead
           title="AI doesn't replace the math"
-          sub="Artificial intelligence is an important part of our technology, but it does not invent our probabilities. The quantitative models generate the numbers — the AI intelligence layer helps interpret them."
+          sub="AI is an important part of our technology, but it doesn't invent our numbers. The math models generate the probabilities — the AI layer simply explains them in plain English."
         />
         <div className="grid gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-2 lg:grid-cols-5">
           {[
-            { icon: Sigma, k: "QUANTITATIVE MODELS", v: "PROBABILITY" },
+            { icon: Sigma, k: "MATH MODELS", v: "PROBABILITY" },
             { icon: Gauge, k: "SPORTSBOOK MARKET", v: "PRICE" },
             { icon: Scale, k: "VALUE ENGINE", v: "EXPECTED VALUE" },
             { icon: Trophy, k: "AI EDGE", v: "OPPORTUNITY RANKING" },
@@ -372,9 +371,9 @@ export default function About() {
           NOW <span className="text-primary" style={{ textShadow: "0 0 24px rgba(34,211,238,0.4)" }}>YOU</span> DO TOO.
         </h3>
         <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground">
-          Proprietary quantitative models. Real-time sportsbook markets.
-          Advanced AI intelligence. One platform built to help bettors make
-          smarter, data-driven decisions.
+          Proprietary prediction models. Real-time sportsbook markets.
+          AI that explains the numbers in plain English. One platform built to
+          help bettors make smarter, data-driven decisions.
         </p>
         <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
           <Link

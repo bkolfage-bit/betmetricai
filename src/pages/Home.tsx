@@ -46,8 +46,8 @@ function BestBetNow() {
             <StatusBadge status={v.status} />
           </div>
           <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 font-mono2 text-[11px]">
-            <div className="flex justify-between gap-2"><dt className="text-muted-foreground">MODEL</dt><dd className="font-bold tabular-nums">{pct(v.modelProb)}</dd></div>
-            <div className="flex justify-between gap-2"><dt className="text-muted-foreground">IMPLIED</dt><dd className="tabular-nums">{pct(v.impliedProb)}</dd></div>
+            <div className="flex justify-between gap-2"><dt className="text-muted-foreground">OUR AI</dt><dd className="font-bold tabular-nums">{pct(v.modelProb)}</dd></div>
+            <div className="flex justify-between gap-2"><dt className="text-muted-foreground">THE BOOK</dt><dd className="tabular-nums">{pct(v.impliedProb)}</dd></div>
             <div className="flex justify-between gap-2"><dt className="text-muted-foreground">EDGE</dt><dd className="text-pos tabular-nums">{signedPct(v.probEdge)}</dd></div>
             <div className="flex justify-between gap-2"><dt className="text-muted-foreground">EV</dt><dd className="text-pos tabular-nums">{signedPct(v.ev)}</dd></div>
             <div className="col-span-2 flex justify-between gap-2 border-t border-border pt-1.5">
@@ -68,12 +68,12 @@ function BestBetNow() {
 }
 
 const PIPELINE = [
-  { icon: Database, title: "Verified data", desc: "Sportsbook odds, injuries, weather and history flow into one normalized feed." },
-  { icon: Sigma, title: "Quant models", desc: "Elo + regression + gradient boosting ensemble produces projections and probabilities." },
-  { icon: Gauge, title: "Value engine", desc: "Model probability vs implied probability → edge, EV, AI Edge Score 0–100." },
-  { icon: RefreshCw, title: "Dynamic picks", desc: "The pick is recalculated whenever the market moves. Every version is stored." },
-  { icon: Brain, title: "AI layer", desc: "The AI explains the numbers — it never invents them." },
-  { icon: Radio, title: "Live monitoring", desc: "Odds, lines and live games are watched continuously; changes trigger alerts." },
+  { icon: Database, title: "Verified data", desc: "Real sportsbook odds, injuries, weather and game history — cleaned, cross-checked and updated around the clock." },
+  { icon: Sigma, title: "The models", desc: "Each sport runs on its own purpose-built math, producing a win probability for every game." },
+  { icon: Gauge, title: "The value engine", desc: "We compare our probability to the sportsbook's price. When they disagree, that gap is your potential edge — scored 0–100." },
+  { icon: RefreshCw, title: "Always current", desc: "Odds move all day. Every pick is recalculated when they do — and the full history is kept so nothing is ever hidden." },
+  { icon: Brain, title: "AI explanations", desc: "The AI turns the numbers into plain English. It explains the math — it never makes it up." },
+  { icon: Radio, title: "Live monitoring", desc: "Games, lines and odds are watched continuously — meaningful changes trigger alerts." },
 ];
 
 export default function Home() {
@@ -136,7 +136,7 @@ export default function Home() {
                 ["WIN RATE", pct(perf.overall.winRate)],
                 ["ROI", signedPct(perf.overall.roi)],
                 ["UNITS", `${num(perf.overall.units) >= 0 ? "+" : ""}${num(perf.overall.units).toFixed(1)}u`],
-                ["AVG CLV", `${num(perf.overall.avgClv) >= 0 ? "+" : ""}${num(perf.overall.avgClv).toFixed(2)}%`],
+                ["VS CLOSING LINE", `${num(perf.overall.avgClv) >= 0 ? "+" : ""}${num(perf.overall.avgClv).toFixed(2)}%`],
               ].map(([k, val]) => (
                 <div key={k}>
                   <p className="label-caps" style={{ fontSize: 8 }}>{k}</p>
@@ -190,17 +190,17 @@ export default function Home() {
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <p className="text-sm leading-relaxed text-muted-foreground">
             Instead of asking "who do I think will win?", our models ask the
-            question at the heart of quantitative sports betting:{" "}
+            only question that matters for long-term profit:{" "}
             <b className="text-foreground">
-              what is the probability of this outcome — and is the sportsbook
-              offering a price that makes the risk worth taking?
+              how likely is this outcome really — and is the sportsbook's
+              price generous enough to make the bet worth it?
             </b>
           </p>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Machine learning, Bayesian modeling, Elo ratings, Monte Carlo
-            simulation, no-vig probabilities, line movement and closing-line
-            value — one proprietary platform that evaluates every market from
-            thousands of angles.{" "}
+            Our platform simulates every game thousands of times, strips out the
+            sportsbook's built-in profit margin, and tracks whether our prices
+            consistently beat the closing line — the same techniques professional
+            bettors use, working for you around the clock.{" "}
             <Link to="/about" className="font-mono2 text-[11px] text-primary hover:underline">
               HOW IT WORKS →
             </Link>
@@ -210,7 +210,7 @@ export default function Home() {
 
       {/* PIPELINE */}
       <section>
-        <SectionHead title="How the machine works" sub="A quantitative pipeline with an AI explanation layer — never the other way around." />
+        <SectionHead title="How the machine works" sub="Real math produces the numbers first — the AI's only job is to explain them in plain English, never to invent them." />
         <div className="grid gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-2 lg:grid-cols-3">
           {PIPELINE.map((s, i) => (
             <div key={s.title} className="group bg-card p-5 transition-colors hover:bg-secondary">
@@ -228,18 +228,18 @@ export default function Home() {
       {/* SIMULATION BAND */}
       <section className="grid gap-px overflow-hidden rounded-sm border border-border bg-border lg:grid-cols-[1fr_1.2fr]">
         <div className="bg-card p-6 sm:p-8">
-          <p className="label-caps mb-2">Monte Carlo engine</p>
-          <h3 className="text-2xl font-extrabold tracking-tight">10,000 SIMULATIONS. ONE DECISION.</h3>
+          <p className="label-caps mb-2">The simulation engine</p>
+          <h3 className="text-2xl font-extrabold tracking-tight">10,000 SIMULATED GAMES. ONE CLEAR ANSWER.</h3>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            Instead of a single predicted score, our models simulate the event
-            thousands of times and measure the full distribution of outcomes.
-            Then we compare that probability against the price in the sportsbook
-            market — that's where prediction becomes{" "}
-            <b className="text-foreground">value analysis</b>.
+            Rather than one guessed score, our engine plays out every game
+            10,000 times and counts how often each team wins. That win rate
+            becomes our probability — and when it's higher than what the
+            sportsbook's price implies, we've found a{" "}
+            <b className="text-foreground">potentially undervalued bet</b>.
           </p>
         </div>
         <div className="flex flex-col justify-center gap-3 bg-secondary p-6 font-mono2 text-xs sm:p-8">
-          <p className="label-caps mb-1">Example — 10,000 Monte Carlo simulations</p>
+          <p className="label-caps mb-1">Example — the same game simulated 10,000 times</p>
           {[
             ["TEAM A WINS", "6,180", "text-pos"],
             ["TEAM B WINS", "3,820", "text-muted-foreground"],
@@ -263,18 +263,18 @@ export default function Home() {
           <h3 className="text-2xl font-extrabold tracking-tight">PREDICTION ≠ BETTING VALUE</h3>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
             A model might believe a team wins 62% of the time. That is a prediction.
-            Whether it is a bet depends entirely on the price. At -105 the sportsbook
-            implies 51.2% — an 10.8-point gap, and a +EV position. At -250 the same
-            prediction is a bad bet. BetMetricAi prices that gap on every market,
-            continuously.
+            Whether it is a bet depends entirely on the price. At odds of -105, the
+            sportsbook is only pricing in a 51.2% chance — a 10.8-point gap in our
+            favor, and a positive-value bet. At -250 the very same prediction is a
+            bad bet. BetMetricAi prices that gap on every market, continuously.
           </p>
         </div>
         <div className="flex flex-col justify-center gap-3 bg-secondary p-6 font-mono2 text-xs sm:p-8">
           {[
-            ["MODEL PROBABILITY", "62.0%", "text-foreground"],
-            ["IMPLIED @ -105", "51.2%", "text-muted-foreground"],
-            ["PROBABILITY EDGE", "+10.8%", "text-pos"],
-            ["EXPECTED VALUE / UNIT", "+7.1%", "text-pos"],
+            ["OUR AI'S WIN CHANCE", "62.0%", "text-foreground"],
+            ["CHANCE PRICED IN AT -105", "51.2%", "text-muted-foreground"],
+            ["GAP IN OUR FAVOR", "+10.8%", "text-pos"],
+            ["EXPECTED PROFIT PER $1", "+7.1%", "text-pos"],
             ["AI EDGE SCORE", "92 / 100 — STRONG BET", "text-pos"],
           ].map(([k, val, cls]) => (
             <div key={k} className="flex items-center justify-between border-b border-border/60 pb-2 last:border-0">
@@ -294,11 +294,11 @@ export default function Home() {
           },
           {
             k: "Every sport is different.",
-            v: "One generic AI doesn't predict everything. Football, basketball, baseball, hockey, soccer, tennis, golf and combat sports each run on sport-specific mathematics.",
+            v: "One generic AI doesn't predict everything. Football, basketball, baseball, hockey, soccer, tennis, golf and combat sports each run on math built specifically for that sport.",
           },
           {
             k: "Transparency matters.",
-            v: "No guaranteed winners. We track win rate, ROI, units, closing line value and calibration over time — because smart betting is better decisions, repeated.",
+            v: "No guaranteed winners. We publish our full record — wins, losses, and whether our picks beat the closing line over time — because smart betting is better decisions, repeated.",
           },
         ].map((s) => (
           <div key={s.k} className="bg-card p-6">
@@ -338,8 +338,8 @@ export default function Home() {
               FULL AI EDGE · PLAYER PROPS · LIVE BETTING · AI ASSISTANT
             </h3>
             <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
-              Proprietary quantitative models. Real-time sportsbook markets. Advanced
-              AI intelligence. $19.99/month or $199/year.
+              Proprietary prediction models. Real-time sportsbook markets. AI
+              explanations in plain English. $19.99/month or $199/year.
             </p>
             <Link
               to="/premium"

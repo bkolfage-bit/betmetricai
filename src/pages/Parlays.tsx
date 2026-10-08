@@ -22,7 +22,7 @@ export default function Parlays() {
     <div className="flex flex-col gap-6">
       <SectionHead
         title="AI parlay builder"
-        sub="Parlays composed from the current highest-edge positions. Combined probability and EV are computed by the quantitative engine — the AI explains them."
+        sub="Multi-leg combinations built from today's strongest value picks. We calculate the true combined win probability and expected return of every ticket — so you can see exactly what you're risking."
       />
 
       {/* builder controls */}
@@ -118,9 +118,9 @@ export default function Parlays() {
           </div>
           <div className="grid gap-px border-t border-border bg-border font-mono2 text-xs sm:grid-cols-3">
             {[
-              ["COMBINED MODEL PROB", pct(data.parlay.combinedProb), "text-foreground"],
-              ["IMPLIED PROBABILITY", pct(data.parlay.impliedProb), "text-muted-foreground"],
-              ["COMBINED EV / UNIT", signedPct(data.parlay.combinedEv), data.parlay.combinedEv >= 0 ? "text-pos" : "text-neg"],
+              ["OUR AI'S WIN CHANCE", pct(data.parlay.combinedProb), "text-foreground"],
+              ["CHANCE IMPLIED BY THE ODDS", pct(data.parlay.impliedProb), "text-muted-foreground"],
+              ["EXPECTED PROFIT PER $1", signedPct(data.parlay.combinedEv), data.parlay.combinedEv >= 0 ? "text-pos" : "text-neg"],
             ].map(([k, val, cls]) => (
               <div key={k as string} className="bg-card px-5 py-3">
                 <p className="label-caps" style={{ fontSize: 8 }}>{k}</p>

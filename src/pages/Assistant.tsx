@@ -74,7 +74,7 @@ export default function Assistant() {
         kind: err.kind ?? "AiTransient",
         text:
           err.kind === "AiUnavailable"
-            ? "AI quota exhausted — this feature is unavailable until the site owner tops up. The quantitative board above keeps working."
+            ? "AI quota exhausted — this feature is unavailable until the site owner tops up. The picks board keeps working in the meantime."
             : err.message || "AI analysis temporarily unavailable.",
       });
     } finally {
@@ -101,7 +101,7 @@ export default function Assistant() {
                 <p className="font-mono2 text-xs font-bold tracking-[0.16em]">BETMETRIC AI ANALYST</p>
                 <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-muted-foreground">
                   Ask anything about the current board. Answers are grounded in the
-                  verified quantitative feed — never in the model's imagination.
+                  same verified data you see on screen — never in the AI's imagination.
                 </p>
               </div>
               <div className="grid w-full max-w-lg gap-2 sm:grid-cols-2">

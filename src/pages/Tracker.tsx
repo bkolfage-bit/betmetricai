@@ -115,8 +115,8 @@ export default function Tracker() {
         <p className="label-caps mb-3">Bet tracker</p>
         <h2 className="text-2xl font-extrabold">SIGN IN TO TRACK YOUR BETS</h2>
         <p className="mt-3 text-sm text-muted-foreground">
-          Your bankroll, results, ROI and CLV live in your account — synced across
-          devices, never in your browser.
+          Your bankroll, results and profit stats live in your account —
+          synced across devices, never in your browser.
         </p>
         <Link
           to="/login"
@@ -132,7 +132,7 @@ export default function Tracker() {
     <div className="flex flex-col gap-6">
       <SectionHead
         title="Bet tracker"
-        sub="Log every bet. Settle results. Watch ROI, units and closing line value accumulate."
+        sub="Log every bet you place and settle the results — your profit, ROI and whether you beat the closing line all build up automatically."
         right={
           <button
             onClick={() => setShowForm(!showForm)}

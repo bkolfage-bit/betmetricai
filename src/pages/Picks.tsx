@@ -43,7 +43,7 @@ export default function Picks() {
     <div className="flex flex-col gap-6">
       <SectionHead
         title="AI Picks"
-        sub="Every pick is versioned. When the market moves, the engine recalculates — and the full timeline stays visible."
+        sub="Our AI's best positions right now, ranked by how strongly the numbers disagree with the sportsbook's price. Every pick updates as odds move — and its full history stays visible."
       />
 
       {/* status filter rail */}
@@ -79,7 +79,7 @@ export default function Picks() {
         {!isLoading && rows.length === 0 && (
           <EmptyState
             title="No picks in this bucket"
-            hint="The engine only issues a position when model probability disagrees with the market price. Check another status or wait for the market to move."
+            hint="We only publish a pick when our AI's probability disagrees with the sportsbook's price enough to matter. Check another status filter, or check back as odds move."
           />
         )}
         {rows.map((row) => (
@@ -105,11 +105,21 @@ export default function Picks() {
         </Link>
       )}
 
-      <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
-        * A 62% win probability is a prediction — not automatically a bet. Statuses
-        reflect the gap between model probability and the current sportsbook price:
-        STRONG BET ≥ 90 · BET ≥ 80 · WATCH ≥ 70 · HOLD ≥ 60 · PASS &lt; 60 (AI Edge Score).
-      </p>
+      <div className="flex flex-col gap-2">
+        <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
+          * A 62% win probability is a prediction — not automatically a good bet.
+          What matters is how that probability compares to the sportsbook's price.
+          Our AI Edge Score (0–100) measures exactly that gap: STRONG BET ≥ 90 ·
+          BET ≥ 80 · WATCH ≥ 70 · HOLD ≥ 60 · PASS &lt; 60. EV (expected value)
+          is the average profit per dollar staked if our probability is right —
+          positive EV means the numbers favor you over the long run.
+        </p>
+        <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
+          * Every pick is versioned: when odds move, the engine re-evaluates and
+          stores a new version — so you can always see what we said, when, and at
+          what price. Nothing is ever edited after the fact.
+        </p>
+      </div>
     </div>
   );
 }

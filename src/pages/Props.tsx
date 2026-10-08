@@ -24,7 +24,7 @@ export default function Props() {
     <div className="flex flex-col gap-6">
       <SectionHead
         title="Player props"
-        sub="Model projections vs sportsbook prop lines. Only markets with reliable underlying data are displayed."
+        sub="Individual player stat lines — points, yards, strikeouts and more — compared against our AI's projection for that player. Only markets with enough reliable player data are shown."
       />
 
       <div className="flex flex-wrap gap-1.5">
@@ -104,7 +104,7 @@ export default function Props() {
         })}
       </div>
       {rows.length === 0 && (
-        <EmptyState title="No props in this market" hint="Props are published only when the underlying player data meets the reliability bar." />
+        <EmptyState title="No props in this market" hint="We only publish a prop when there's enough reliable player data behind the projection — nothing is guessed." />
       )}
     </div>
   );

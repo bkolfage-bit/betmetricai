@@ -43,7 +43,7 @@ export default function PlusEV() {
         <table className="w-full min-w-[760px] border-collapse font-mono2 text-xs">
           <thead>
             <tr className="border-b border-border text-left">
-              {["SPORT", "EVENT", "DATE", "SELECTION", "BOOK", "PRICE", "MODEL", "IMPLIED", "EDGE", "EV/UNIT", "AI EDGE", "STATUS", "UPDATED"].map((h) => (
+              {["SPORT", "EVENT", "DATE", "SELECTION", "BOOK", "PRICE", "OUR ODDS", "BOOK'S ODDS", "EDGE", "EV/UNIT", "AI EDGE", "STATUS", "UPDATED"].map((h) => (
                 <th key={h} className="label-caps px-3 py-2.5 font-normal">{h}</th>
               ))}
             </tr>
@@ -102,6 +102,12 @@ export default function PlusEV() {
           * What is Vig? Vig is the sportsbook's built-in profit margin. Our AI removes
           this margin when analyzing market probabilities, helping reveal the true odds
           behind the sportsbook's pricing.
+        </p>
+        <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
+          * How to read the columns: OUR ODDS is our AI's estimated win probability;
+          BOOK'S ODDS is the win probability implied by the sportsbook's price. When
+          ours is higher, the difference is your EDGE — and EV/UNIT is the average
+          profit per dollar staked if our numbers are right.
         </p>
       </div>
 

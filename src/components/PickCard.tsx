@@ -57,8 +57,8 @@ function VersionTimeline({ pickId }: { pickId: number }) {
               </div>
               <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 font-mono2 text-[10px] text-muted-foreground">
                 <span>EDGE <b className="text-foreground">{v.edgeScore}</b></span>
-                <span>MODEL <b className="text-foreground">{pct(v.modelProb)}</b></span>
-                <span>IMPLIED <b className="text-foreground">{pct(v.impliedProb)}</b></span>
+                <span>OUR AI <b className="text-foreground">{pct(v.modelProb)}</b></span>
+                <span>THE BOOK <b className="text-foreground">{pct(v.impliedProb)}</b></span>
                 <span>EV <b className={num(v.ev) >= 0 ? "text-pos" : "text-neg"}>{signedPct(v.ev)}</b></span>
               </div>
               {v.changeReason && (
@@ -172,7 +172,7 @@ export function PickCard({ row, defaultOpen = false }: { row: PickRow; defaultOp
               Best price: <span className="text-primary">{row.book?.name} {fmtOdds(v.odds)}</span>
               {v.betUpTo !== null && (
                 <span className="ml-3">
-                  Bet up to:{" "}
+                  Value cutoff:{" "}
                   <span className="text-foreground">
                     {row.pick.market === "moneyline"
                       ? fmtOdds(num(v.betUpTo))
@@ -187,7 +187,7 @@ export function PickCard({ row, defaultOpen = false }: { row: PickRow; defaultOp
 
           <div className="flex items-center gap-4 sm:gap-6">
             <div className="hidden text-right sm:block">
-              <p className="label-caps" style={{ fontSize: 8 }}>Model vs implied</p>
+              <p className="label-caps" style={{ fontSize: 8 }}>Our AI vs the book</p>
               <p className="font-mono2 text-xs tabular-nums">
                 <b>{pct(v.modelProb)}</b>
                 <span className="text-muted-foreground"> / {pct(v.impliedProb)}</span>

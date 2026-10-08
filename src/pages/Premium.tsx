@@ -20,7 +20,7 @@ const PRO = [
   "AI parlay builder",
   "Real-time alerts",
   "Advanced bet tracker & bankroll analytics",
-  "Full historical performance & CLV",
+  "Full historical performance & closing-line record",
 ];
 
 const PLANS = [
