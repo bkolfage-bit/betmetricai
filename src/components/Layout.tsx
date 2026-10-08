@@ -61,7 +61,6 @@ const MOBILE_NAV = [
   { to: "/picks", label: "PICKS", icon: Crosshair },
   { to: "/saved", label: "SAVED", icon: Heart },
   { to: "/ev", label: "+EV", icon: Activity },
-  { to: "/tracker", label: "TRACKER", icon: Wallet },
 ] as const;
 
 /** Everything beyond the bottom bar — surfaced through the mobile MENU sheet. */
