@@ -24,6 +24,22 @@ export interface ProviderEvent {
   commenceTime: Date;
 }
 
+/** Live / final score state for an event (provider /scores endpoint). */
+export interface ProviderScore {
+  providerEventId: string;
+  sportKey: string;
+  homeTeam: string;
+  awayTeam: string;
+  commenceTime: Date;
+  /** true once the game has actually started */
+  started: boolean;
+  completed: boolean;
+  /** ISO last-update timestamp from the provider (null when unknown) */
+  lastUpdate: Date | null;
+  homeScore: number | null;
+  awayScore: number | null;
+}
+
 /** One outcome as supplied by the provider. */
 export interface ProviderOutcome {
   name: string; // team name, or "Over"/"Under"
@@ -70,6 +86,15 @@ export interface OddsProvider {
   listSports(): Promise<ProviderResult<ProviderSport[]>>;
   /** Free endpoint — discover events for a sport (no odds cost). */
   listEvents(sportKey: string): Promise<ProviderResult<ProviderEvent[]>>;
+  /**
+   * Paid endpoint — live/final scores for a sport (1 credit per call,
+   * daysFrom<=3). Used to flip events scheduled->live->final with real
+   * scores; never synthesized.
+   */
+  getScores(
+    sportKey: string,
+    opts: { daysFrom?: number; eventIds?: string[] },
+  ): Promise<ProviderResult<ProviderScore[]>>;
   /** Paid endpoint — core/additional markets for a sport. */
   getOdds(
     sportKey: string,

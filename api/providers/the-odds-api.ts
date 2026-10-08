@@ -5,7 +5,7 @@
  * It is never logged, never returned in responses, never sent to the
  * frontend. All requests originate from this backend.
  */
-import type {
+import type { ProviderScore,
   OddsProvider,
   ProviderEvent,
   ProviderEventOdds,
@@ -51,6 +51,17 @@ interface RawEvent {
   home_team: string;
   away_team: string;
   bookmakers?: RawBookmaker[];
+}
+interface RawScore {
+  id: string;
+  sport_key: string;
+  sport_title?: string;
+  commence_time: string;
+  home_team: string;
+  away_team: string;
+  completed: boolean;
+  last_update: string | null;
+  scores: { name: string; score: string }[] | null;
 }
 
 export class TheOddsApiProvider implements OddsProvider {
@@ -160,6 +171,46 @@ export class TheOddsApiProvider implements OddsProvider {
       },
     );
     return { ...r, data: mapEventOdds(r.data) };
+  }
+
+  async getScores(
+    sportKey: string,
+    opts: { daysFrom?: number; eventIds?: string[] },
+  ): Promise<ProviderResult<ProviderScore[]>> {
+    const r = await this.request<RawScore[]>(
+      `/v4/sports/${encodeURIComponent(sportKey)}/scores`,
+      {
+        daysFrom: opts.daysFrom !== undefined ? String(opts.daysFrom) : undefined,
+        eventIds: opts.eventIds?.length ? opts.eventIds.join(",") : undefined,
+        dateFormat: "iso",
+      },
+    );
+    const now = Date.now();
+    return {
+      ...r,
+      data: r.data.map((e) => {
+        const home = e.scores?.find((x) => x.name === e.home_team);
+        const away = e.scores?.find((x) => x.name === e.away_team);
+        const parse = (v: string | undefined) => {
+          if (v === undefined) return null;
+          const n = Number(v);
+          return Number.isFinite(n) ? n : null;
+        };
+        return {
+          providerEventId: e.id,
+          sportKey: e.sport_key,
+          homeTeam: e.home_team,
+          awayTeam: e.away_team,
+          commenceTime: new Date(e.commence_time),
+          // provider omits "started"; scores existing OR tip time passed
+          started: e.completed || e.scores !== null || new Date(e.commence_time).getTime() <= now,
+          completed: e.completed,
+          lastUpdate: e.last_update ? new Date(e.last_update) : null,
+          homeScore: parse(home?.score),
+          awayScore: parse(away?.score),
+        };
+      }),
+    };
   }
 }
 

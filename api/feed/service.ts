@@ -10,7 +10,7 @@
  *  - quota tiers throttle and then suspend paid calls automatically
  *  - failures are recorded — never papered over with fabricated odds
  */
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { getDb } from "../queries/connection";
 import {
   adminConfig,
@@ -417,7 +417,8 @@ async function ensureEvent(ev: ProviderEventOdds, sportId: number): Promise<numb
  */
 export async function ensurePrediction(eventId: number, sportCode: string): Promise<boolean> {
   const db = getDb();
-  const [existing] = await db.select({ id: predictions.id }).from(predictions).where(eq(predictions.eventId, eventId)).limit(1);
+  // an existing PREGAME row satisfies the guard; live rows are additive
+  const [existing] = await db.select({ id: predictions.id }).from(predictions).where(and(eq(predictions.eventId, eventId), eq(predictions.isLive, false))).limit(1);
   if (existing) return true;
   const [ev] = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
   if (!ev) return false;
@@ -451,6 +452,9 @@ export async function ensurePrediction(eventId: number, sportCode: string): Prom
       isLive: false,
       createdAt: new Date(),
     });
+    if (ev.status === "live") {
+      await ensureLivePrediction(ev, sportCode).catch(() => false);
+    }
     return true;
   } catch {
     // sport has no registered model — skip prediction, odds still sync
@@ -598,6 +602,302 @@ const BOOKMAKERS = () => {
 };
 
 /** Paid odds sync for one internal sport code across its active provider keys. */
+
+/* ============================= live model engine ============================= */
+/**
+ * Live intelligence: the /scores feed flips events scheduled -> live -> final
+ * with REAL scores from the provider (never synthesized). While an event is
+ * live, the pregame model's projection is adjusted for the observed game
+ * state (score differential + time remaining) and re-persisted as an
+ * isLive=true prediction; pick versions are then repriced against the
+ * in-game market exactly like pregame versions.
+ */
+
+/** Approximate clock string from elapsed fraction — display only. */
+function liveClock(code: string, elapsedFrac: number): { period: string; clock: string } {
+  const remaining = Math.max(0, 1 - elapsedFrac);
+  switch (code) {
+    case "NFL":
+    case "NCAAF": {
+      const q = Math.min(4, Math.floor(elapsedFrac * 4) + 1);
+      const minsLeft = Math.max(0, Math.ceil(remaining * 60) - (4 - q) * 15);
+      return { period: `Q${q}`, clock: `${Math.min(15, minsLeft)}:00` };
+    }
+    case "NBA":
+    case "NCAAB": {
+      const periods = code === "NBA" ? 4 : 2;
+      const label = code === "NBA" ? "Q" : "H";
+      const p = Math.min(periods, Math.floor(elapsedFrac * periods) + 1);
+      const perMin = code === "NBA" ? 12 : 20;
+      const minsLeft = Math.max(0, Math.ceil(remaining * perMin * periods) - (periods - p) * perMin);
+      return { period: `${label}${p}`, clock: `${Math.min(perMin, minsLeft)}:00` };
+    }
+    case "NHL": {
+      const p = Math.min(3, Math.floor(elapsedFrac * 3) + 1);
+      const minsLeft = Math.max(0, Math.ceil(remaining * 60) - (3 - p) * 20);
+      return { period: `P${p}`, clock: `${Math.min(20, minsLeft)}:00` };
+    }
+    case "MLB": {
+      const inning = Math.min(9, Math.floor(elapsedFrac * 9) + 1);
+      return { period: `INN ${inning}`, clock: "" };
+    }
+    case "SOCCER": {
+      const min = Math.min(90, Math.floor(elapsedFrac * 90));
+      return { period: min > 45 ? "2H" : "1H", clock: `${min}'` };
+    }
+    default:
+      return { period: "LIVE", clock: `${Math.round(remaining * 100)}% left` };
+  }
+}
+
+/** Regulation minutes per sport for elapsed-time estimation. */
+const REG_MINUTES: Record<string, number> = {
+  NFL: 60, NCAAF: 60, NBA: 48, NCAAB: 40, NHL: 60, MLB: 180, SOCCER: 90,
+  TENNIS: 120, UFC: 25, GOLF: 480,
+};
+
+/**
+ * Adjust a pregame projection for the live game state. The pregame model's
+ * remaining scoring rates are preserved; the observed score and shrunk
+ * remaining window do the work. Win prob comes from a normal margin model —
+ * same distribution family as the pregame engine (markets.ts).
+ */
+function liveAdjust(
+  sportCode: string,
+  pre: {
+    projHomeScore: number; projAwayScore: number; projSpread: number;
+    projTotal: number; homeWinProb: number; confidence: number;
+    details: string | null;
+  },
+  homeScore: number,
+  awayScore: number,
+  elapsedFrac: number,
+): {
+  projHomeScore: number; projAwayScore: number; projSpread: number;
+  projTotal: number; homeWinProb: number; confidence: number;
+} {
+  const remaining = Math.max(0.03, 1 - elapsedFrac);
+  // remaining scoring at pregame rates, scaled by time left
+  const remHome = pre.projHomeScore * remaining;
+  const remAway = pre.projAwayScore * remaining;
+  const projHome = homeScore + remHome;
+  const projAway = awayScore + remAway;
+  const projMargin = projHome - projAway;
+  const projTotal = projHome + projAway;
+
+  // margin uncertainty shrinks as the game progresses: full-game SD from the
+  // pregame distribution if present, else sport-typical values
+  // per-REGULATION-GAME margin SD for continuous-clock sports; per-opportunity
+  // SD for sports whose "remaining" window is balls/outs rather than clock,
+  // so a mid-game deficit isn't treated as nearly decided.
+  const sportSd: Record<string, number> = {
+    NFL: 13.5, NCAAF: 14.5, NBA: 12.5, NCAAB: 11, NHL: 2.5,
+    SOCCER: 1.7, TENNIS: 3.5, UFC: 1.2, GOLF: 2.5, MLB: 2.1,
+  };
+  const sd = sportSd[sportCode] ?? 10;
+  // MLB/NHL/SOCCER margins accumulate per opportunity, not per clock tick —
+  // the uncertainty of the FINAL margin = per-unit SD scaled by total
+  // opportunities elapsed + remaining, i.e. grows much slower than sqrt(remaining)
+  const sdRemaining =
+    sportCode === "MLB" || sportCode === "NHL" || sportCode === "SOCCER"
+      ? sd * Math.sqrt(Math.max(remaining, 0.35)) // floors late-game uncertainty
+      : sd * Math.sqrt(remaining);
+  const z = projMargin / Math.max(0.5, sdRemaining);
+  // normal CDF
+  const homeWinProb = 0.5 * (1 + erf(z / Math.SQRT2));
+
+  return {
+    projHomeScore: Math.round(projHome * 10) / 10,
+    projAwayScore: Math.round(projAway * 10) / 10,
+    projSpread: Math.round(projMargin * 2) / 2,
+    projTotal: Math.round(projTotal * 2) / 2,
+    homeWinProb: Math.min(0.999, Math.max(0.001, homeWinProb)),
+    confidence: Math.min(0.99, pre.confidence + elapsedFrac * 0.25),
+  };
+}
+
+function erf(x: number): number {
+  // Abramowitz-Stegun 7.1.26
+  const t = 1 / (1 + 0.3275911 * Math.abs(x));
+  const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+  return x >= 0 ? y : -y;
+}
+
+/** Regenerate the live (isLive=true) prediction for one in-progress event. */
+async function ensureLivePrediction(
+  ev: { id: number; sportId: number; homeTeamId: number; awayTeamId: number; homeScore: number | null; awayScore: number | null; startTime: Date },
+  sportCode: string,
+): Promise<boolean> {
+  const db = getDb();
+  const model = getSportModel(sportCode);
+  // pregame baseline
+  const [pre] = await db
+    .select()
+    .from(predictions)
+    .where(and(eq(predictions.eventId, ev.id), eq(predictions.isLive, false)))
+    .orderBy(desc(predictions.id))
+    .limit(1);
+  if (!pre) return false;
+  const hs = ev.homeScore ?? 0;
+  const as = ev.awayScore ?? 0;
+  const regMin = REG_MINUTES[sportCode] ?? 60;
+  // real-time estimate: low-scoring sports run longer in wall-clock per
+  // regulation minute; this only drives the clock display + shrink factor
+  const wallClockMult = sportCode === "MLB" ? 1 : sportCode === "SOCCER" ? 1.06 : 1.75;
+  const elapsedMin = (Date.now() - ev.startTime.getTime()) / 60_000;
+  // elapsed fraction measured against realistic wall-clock game lengths;
+  // startTime is first pitch/tip, so a game exceeds regulation minutes in
+  // real time (halftime, commercial breaks, mound visits)
+  const estWallMin =
+    sportCode === "MLB" ? 200 :
+    sportCode === "SOCCER" ? 115 :
+    sportCode === "NHL" ? 150 :
+    sportCode === "NBA" ? 145 :
+    sportCode === "NFL" || sportCode === "NCAAF" ? 200 :
+    sportCode === "NCAAB" ? 130 :
+    regMin * wallClockMult;
+  const elapsedFrac = Math.min(0.97, Math.max(0, elapsedMin / estWallMin));
+
+  const adj = liveAdjust(
+    sportCode,
+    {
+      projHomeScore: parseFloat(pre.projHomeScore),
+      projAwayScore: parseFloat(pre.projAwayScore),
+      projSpread: parseFloat(pre.projSpread),
+      projTotal: parseFloat(pre.projTotal),
+      homeWinProb: parseFloat(pre.homeWinProb),
+      confidence: parseFloat(pre.confidence),
+      details: pre.details,
+    },
+    hs,
+    as,
+    elapsedFrac,
+  );
+  if (!Number.isFinite(adj.homeWinProb) || adj.homeWinProb <= 0 || adj.homeWinProb >= 1) return false;
+
+  await db.insert(predictions).values({
+    eventId: ev.id,
+    modelId: model.modelId,
+    modelVersion: model.modelVersion,
+    projHomeScore: adj.projHomeScore.toFixed(1),
+    projAwayScore: adj.projAwayScore.toFixed(1),
+    projSpread: adj.projSpread.toFixed(1),
+    projTotal: adj.projTotal.toFixed(1),
+    homeWinProb: adj.homeWinProb.toFixed(4),
+    confidence: adj.confidence.toFixed(3),
+    agreement: pre.agreement,
+    details: pre.details,
+    isLive: true,
+    createdAt: new Date(),
+  });
+  return true;
+}
+
+/**
+ * Pull real scores for a sport and apply them: status transitions, score
+ * fields, clock label, live predictions and pick repricing for live games,
+ * plus closing-line capture when a game goes final.
+ */
+export async function syncScores(sportCode: string): Promise<{ updated: number; liveNow: number; finals: number; errors: string[] }> {
+  const out = { updated: 0, liveNow: 0, finals: 0, errors: [] as string[] };
+  const db = getDb();
+  const provider = getOddsProvider();
+  const keys = await db
+    .select()
+    .from(oddsSportMap)
+    .where(and(eq(oddsSportMap.sportCode, sportCode), eq(oddsSportMap.status, "active")));
+  if (keys.length === 0) return out;
+
+  const now = new Date();
+  // events that could plausibly be live/final: started within the last 12h
+  // and not yet marked final
+  const windowStart = new Date(now.getTime() - 12 * 3600_000);
+  const tracked = await db
+    .select()
+    .from(events)
+    .where(
+      and(
+        eq(events.provider, "THE_ODDS_API"),
+        inArray(events.status, ["scheduled", "live"]),
+        lte(events.startTime, now),
+        gte(events.startTime, windowStart),
+        inArray(events.sportId, [await sportIdByCode().then((m) => m.get(sportCode) ?? -1)]),
+      ),
+    );
+  if (tracked.length === 0) return out;
+  const byProviderId = new Map(tracked.map((e) => [e.providerEventId, e] as const));
+
+  for (const keyRow of keys) {
+    let scores;
+    try {
+      const res = await provider.getScores(keyRow.providerSportKey, { daysFrom: 1 });
+      await logUsage(`/v4/sports/${keyRow.providerSportKey}/scores`, keyRow.providerSportKey, res.quota, res.latencyMs, "ok");
+      scores = res.data;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      out.errors.push(msg);
+      await logUsage(`/v4/sports/${keyRow.providerSportKey}/scores`, keyRow.providerSportKey, null, 0, "error", msg.slice(0, 250));
+      continue;
+    }
+    for (const sc of scores) {
+      const ev = sc.providerEventId ? byProviderId.get(sc.providerEventId) : undefined;
+      if (!ev) continue;
+      const elapsedMin = (now.getTime() - ev.startTime.getTime()) / 60_000;
+      const regMin = REG_MINUTES[sportCode] ?? 60;
+      const estWallMin =
+        sportCode === "MLB" ? 200 :
+        sportCode === "SOCCER" ? 115 :
+        sportCode === "NHL" ? 150 :
+        sportCode === "NBA" ? 145 :
+        sportCode === "NFL" || sportCode === "NCAAF" ? 200 :
+        sportCode === "NCAAB" ? 130 :
+        regMin * 1.75;
+      const clock = liveClock(sportCode, Math.min(0.97, Math.max(0, elapsedMin / estWallMin)));
+
+      if (sc.completed && ev.status !== "final") {
+        await db.update(events).set({
+          status: "final",
+          homeScore: sc.homeScore ?? ev.homeScore,
+          awayScore: sc.awayScore ?? ev.awayScore,
+          period: "FINAL",
+          clock: null,
+        }).where(eq(events.id, ev.id));
+        out.finals++;
+        out.updated++;
+        continue;
+      }
+      if (sc.started && ev.status === "scheduled") {
+        await db.update(events).set({
+          status: "live",
+          homeScore: sc.homeScore,
+          awayScore: sc.awayScore,
+          period: clock.period,
+          clock: clock.clock || null,
+        }).where(eq(events.id, ev.id));
+        out.liveNow++;
+        out.updated++;
+      } else if (ev.status === "live") {
+        await db.update(events).set({
+          homeScore: sc.homeScore ?? ev.homeScore,
+          awayScore: sc.awayScore ?? ev.awayScore,
+          period: clock.period,
+          clock: clock.clock || null,
+        }).where(eq(events.id, ev.id));
+        out.updated++;
+      }
+
+      // live model: regenerate the in-game projection + reprice picks
+      const isLiveNow = sc.started && !sc.completed;
+      if (isLiveNow) {
+        const [fresh] = await db.select().from(events).where(eq(events.id, ev.id)).limit(1);
+        const ok = await ensureLivePrediction(fresh, sportCode).catch(() => false);
+        if (ok) await recomputeEventPicks(fresh.id).catch(() => undefined);
+      }
+    }
+  }
+  return out;
+}
+
 export async function syncSportOdds(
   sportCode: string,
   opts: { eventIds?: string[] } = {},

@@ -20,6 +20,7 @@ import {
   getFeedMode,
   getQuotaState,
   syncOutrights,
+  syncScores,
   syncSportOdds,
 } from "./service";
 
@@ -29,7 +30,9 @@ const LIVE_GRACE_MS = 4 * 60 * 60 * 1000; // keep polling up to 4h after start
 const MAX_EVENTS_PER_CALL = 20;
 const HORIZON_MS = FORECAST_HORIZON_DAYS * 24 * 60 * 60 * 1000;
 const OUTRIGHTS_INTERVAL_MS = 24 * 60 * 60 * 1000; // futures move slowly
+const SCORES_INTERVAL_MS = 5 * 60 * 1000; // /scores: 1 credit per sport-key
 let lastOutrightsRun = 0;
+let lastScoresRun = 0;
 
 interface TierDef {
   maxAheadMs: number;
@@ -111,6 +114,25 @@ async function tick(): Promise<void> {
         `[feed] ${code}: ${res.rowsWritten} rows (${res.eventsWithOdds} events, cost ${res.cost})` +
           (res.errors.length ? ` ERRORS: ${res.errors.join("; ")}` : ""),
       );
+    }
+
+    // live scores pass: flips scheduled->live->final with REAL provider
+    // scores and feeds the live model. 1 credit per active sport key,
+    // throttled to every 5 min — cheap relative to odds polling.
+    if (now - lastScoresRun >= SCORES_INTERVAL_MS) {
+      lastScoresRun = now;
+      for (const code of codes) {
+        const r = await syncScores(code).catch((e) => ({
+          updated: 0, liveNow: 0, finals: 0,
+          errors: [e instanceof Error ? e.message : String(e)],
+        }));
+        if (r.updated > 0 || r.errors.length > 0) {
+          console.log(
+            `[feed] ${code} scores: ${r.updated} updated (${r.liveNow} live, ${r.finals} final)` +
+              (r.errors.length ? ` ERRORS: ${r.errors.join("; ")}` : ""),
+          );
+        }
+      }
     }
 
     // championship / futures exception: outrights sync daily, regardless of
