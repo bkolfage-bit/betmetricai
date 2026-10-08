@@ -22,7 +22,7 @@ export default function PlusEV() {
     <div className="flex flex-col gap-6">
       <SectionHead
         title="+EV opportunities"
-        sub="Positions where the model probability beats the no-vig implied probability at the best available price. Sorted by expected value per unit."
+        sub="Our proprietary AI analyzes thousands of data points and compares predicted outcomes against real-time sportsbook odds to uncover potentially undervalued bets. Each +EV opportunity is ranked by its estimated long-term value, helping you find where the numbers suggest an edge over Vegas."
         right={
           <label className="flex items-center gap-2 font-mono2 text-[10px] text-muted-foreground">
             MIN EV
