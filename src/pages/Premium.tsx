@@ -1,7 +1,8 @@
 import { Link } from "react-router";
+import { useAuth } from "@/hooks/useAuth";
 import { SectionHead } from "@/components/bits";
 import { cn } from "@/lib/utils";
-import { Check, Minus, Sparkles } from "lucide-react";
+import { BadgeCheck, Check, Minus, Sparkles } from "lucide-react";
 
 const FREE = [
   "2 AI picks per sport",
@@ -50,29 +51,53 @@ const PLANS = [
 ];
 
 export default function Premium() {
+  const { user } = useAuth();
+  const isPro = user?.plan === "pro" || user?.role === "admin";
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-10">
-      {/* beta access notice — billing not yet connected, access is admin-granted */}
-      <div className="panel flex flex-wrap items-center justify-between gap-4 rounded-sm border-[#fbbf24]/40 p-5">
-        <div className="flex items-start gap-3">
-          <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-warn" />
-          <div>
-            <p className="font-mono2 text-xs font-bold tracking-[0.16em] text-warn">
-              BETA — PRO ACCESS IS GRANTED BY INVITE
-            </p>
-            <p className="mt-1 max-w-lg text-xs leading-relaxed text-muted-foreground">
-              Billing is not connected yet. Create a free account, then ask the
-              platform admin to activate PRO on it — it unlocks instantly.
-            </p>
+      {isPro ? (
+        <div className="panel flex flex-wrap items-center justify-between gap-4 rounded-sm border-[#34d399]/40 p-5">
+          <div className="flex items-start gap-3">
+            <BadgeCheck className="mt-0.5 h-5 w-5 shrink-0 text-pos" />
+            <div>
+              <p className="font-mono2 text-xs font-bold tracking-[0.16em] text-pos">
+                PRO PLAN ACTIVE ON YOUR ACCOUNT
+              </p>
+              <p className="mt-1 max-w-lg text-xs leading-relaxed text-muted-foreground">
+                Everything below is already unlocked for you — unlimited picks, full
+                AI Edge, props, +EV, live model, AI assistant and advanced tracking.
+              </p>
+            </div>
           </div>
+          <Link
+            to="/picks"
+            className="min-h-[44px] rounded-sm bg-primary px-5 py-3 font-mono2 text-[11px] font-bold tracking-[0.14em] text-primary-foreground transition-transform hover:scale-[1.02]"
+          >
+            VIEW FULL BOARD
+          </Link>
         </div>
-        <Link
-          to="/login"
-          className="min-h-[44px] rounded-sm bg-[#fbbf24] px-5 py-3 font-mono2 text-[11px] font-bold tracking-[0.14em] text-[#050810] transition-transform hover:scale-[1.02]"
-        >
-          CREATE FREE ACCOUNT
-        </Link>
-      </div>
+      ) : (
+        <div className="panel flex flex-wrap items-center justify-between gap-4 rounded-sm border-[#fbbf24]/40 p-5">
+          <div className="flex items-start gap-3">
+            <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-warn" />
+            <div>
+              <p className="font-mono2 text-xs font-bold tracking-[0.16em] text-warn">
+                BETA — PRO ACCESS IS GRANTED BY INVITE
+              </p>
+              <p className="mt-1 max-w-lg text-xs leading-relaxed text-muted-foreground">
+                Billing is not connected yet. Create a free account, then ask the
+                platform admin to activate PRO on it — it unlocks instantly.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/login"
+            className="min-h-[44px] rounded-sm bg-[#fbbf24] px-5 py-3 font-mono2 text-[11px] font-bold tracking-[0.14em] text-[#050810] transition-transform hover:scale-[1.02]"
+          >
+            CREATE FREE ACCOUNT
+          </Link>
+        </div>
+      )}
 
       <div className="text-center">
         <p className="label-caps mb-3">Premium</p>
@@ -113,12 +138,26 @@ export default function Premium() {
                 </li>
               ))}
             </ul>
-            {p.name === "FREE" ? (
+            {isPro && p.name !== "FREE" ? (
+              <button
+                className="mt-6 min-h-[44px] rounded-sm border border-[#34d399]/50 font-mono2 text-[11px] font-bold tracking-[0.16em] text-pos"
+                disabled
+              >
+                CURRENT PLAN
+              </button>
+            ) : isPro && p.name === "FREE" ? (
               <button
                 className="mt-6 min-h-[44px] rounded-sm border border-border font-mono2 text-[11px] font-bold tracking-[0.16em] text-muted-foreground"
                 disabled
               >
-                {p.cta}
+                INCLUDED
+              </button>
+            ) : !isPro && p.name === "FREE" ? (
+              <button
+                className="mt-6 min-h-[44px] rounded-sm border border-border font-mono2 text-[11px] font-bold tracking-[0.16em] text-muted-foreground"
+                disabled
+              >
+                {user ? "CURRENT PLAN" : p.cta}
               </button>
             ) : (
               <Link

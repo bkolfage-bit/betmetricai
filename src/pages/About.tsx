@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { useAuth } from "@/hooks/useAuth";
 import { SectionHead } from "@/components/bits";
 import {
   ArrowRight,
@@ -64,6 +65,8 @@ const TRACKED_METRICS = [
 ];
 
 export default function About() {
+  const { user } = useAuth();
+  const isPro = user?.plan === "pro" || user?.role === "admin";
   return (
     <div className="flex flex-col gap-14">
       {/* HERO — level the playing field */}
@@ -385,12 +388,21 @@ export default function About() {
           >
             VIEW TODAY'S PICKS
           </Link>
-          <Link
-            to="/premium"
-            className="rounded-sm border border-primary/50 px-6 py-3 font-mono2 text-[11px] font-bold tracking-[0.16em] text-primary transition-colors hover:bg-live-dim"
-          >
-            GO PRO
-          </Link>
+          {isPro ? (
+            <Link
+              to="/account"
+              className="rounded-sm border border-warn/50 px-6 py-3 font-mono2 text-[11px] font-bold tracking-[0.16em] text-warn transition-colors hover:bg-warn-dim"
+            >
+              PRO PLAN ACTIVE
+            </Link>
+          ) : (
+            <Link
+              to="/premium"
+              className="rounded-sm border border-primary/50 px-6 py-3 font-mono2 text-[11px] font-bold tracking-[0.16em] text-primary transition-colors hover:bg-live-dim"
+            >
+              GO PRO
+            </Link>
+          )}
         </div>
         <p className="mx-auto mt-8 max-w-2xl font-mono2 text-[9px] leading-relaxed text-muted-foreground/70">
           Our platform provides sports analytics and informational tools only

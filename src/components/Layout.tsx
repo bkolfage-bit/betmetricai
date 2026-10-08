@@ -29,7 +29,7 @@ import {
   Wallet,
 } from "lucide-react";
 
-const NAV = [
+const NAV_BASE = [
   { to: "/", label: "HOME" },
   { to: "/picks", label: "PICKS" },
   { to: "/live", label: "LIVE" },
@@ -41,8 +41,15 @@ const NAV = [
   { to: "/assistant", label: "AI ASSISTANT" },
   { to: "/tracker", label: "BET TRACKER" },
   { to: "/performance", label: "PERFORMANCE" },
-  { to: "/premium", label: "PREMIUM" },
 ];
+
+/** Top-nav items; the /premium entry reads as PLAN once the user is PRO. */
+function navFor(plan?: string) {
+  return [
+    ...NAV_BASE,
+    { to: "/premium", label: plan === "pro" ? "PLAN" : "PREMIUM" },
+  ];
+}
 
 const MOBILE_NAV = [
   { to: "/", label: "HOME", icon: Home },
@@ -78,7 +85,6 @@ const MOBILE_MENU_SECTIONS = [
   {
     title: "ACCOUNT",
     items: [
-      { to: "/premium", label: "Go Pro", icon: Sparkles, pro: false },
       { to: "/account", label: "My Account", icon: CircleUser, pro: false },
       { to: "/about", label: "About / How It Works", icon: Info, pro: false },
     ],
@@ -196,11 +202,6 @@ function MobileMenu() {
                   </p>
                 </div>
                 {user.role === "admin" && <Shield className="h-4 w-4 text-warn" />}
-                {user.plan !== "pro" && (
-                  <span className="rounded-sm bg-primary px-2 py-1 font-mono2 text-[9px] font-bold tracking-[0.1em] text-primary-foreground">
-                    GO PRO
-                  </span>
-                )}
               </Link>
             ) : (
               <div className="flex items-center gap-3">
@@ -222,7 +223,21 @@ function MobileMenu() {
           </div>
 
           {/* feature sections */}
-          {MOBILE_MENU_SECTIONS.map((sec) => (
+          {MOBILE_MENU_SECTIONS.map((sec) => {
+            const items = [
+              ...sec.items,
+              ...(sec.title === "ACCOUNT"
+                ? [
+                    {
+                      to: "/premium",
+                      label: user?.plan === "pro" ? "Plan & Billing" : "Go Pro",
+                      icon: Sparkles,
+                      pro: false,
+                    } as const,
+                  ]
+                : []),
+            ];
+            return (
             <div key={sec.title} className="px-5 pt-4">
               <p className="label-caps mb-2 flex items-center gap-2">
                 {sec.title}
@@ -231,7 +246,7 @@ function MobileMenu() {
                 )}
               </p>
               <div className="grid grid-cols-2 gap-1.5">
-                {sec.items.map((item) => {
+                {items.map((item) => {
                   const Icon = item.icon;
                   const active =
                     item.to === "/"
@@ -271,7 +286,8 @@ function MobileMenu() {
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </SheetContent>
     </Sheet>
@@ -296,7 +312,7 @@ export default function Layout() {
         <div className="mx-auto flex h-14 max-w-[1500px] items-center gap-2 px-3 sm:gap-4 sm:px-5">
           <Logo />
           <nav className="hidden h-14 flex-1 items-stretch gap-0.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] lg:flex [&::-webkit-scrollbar]:hidden">
-            {NAV.map((n) => (
+            {navFor(user?.plan).map((n) => (
               <NavLink
                 key={n.to}
                 to={n.to}
@@ -344,7 +360,7 @@ export default function Layout() {
       {/* mobile/tablet: full section nav — swipeable strip mirroring the desktop top nav */}
       <nav className="border-b border-border/60 bg-card/40 lg:hidden">
         <div className="mx-auto flex max-w-[1500px] items-stretch gap-0.5 overflow-x-auto px-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {NAV.map((n) => (
+          {navFor(user?.plan).map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
@@ -411,7 +427,9 @@ export default function Layout() {
           <div>
             <p className="label-caps mb-3">Account</p>
             <div className="flex flex-col gap-2 text-xs text-muted-foreground">
-              <Link to="/premium" className="hover:text-foreground">Go Pro</Link>
+              <Link to="/premium" className="hover:text-foreground">
+                {user?.plan === "pro" ? "Plan & Billing" : "Go Pro"}
+              </Link>
               <Link to="/tracker" className="hover:text-foreground">Bet Tracker</Link>
               <Link to="/account" className="hover:text-foreground">Account</Link>
               {user?.role === "admin" && (

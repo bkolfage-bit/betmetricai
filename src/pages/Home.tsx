@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { useSportFilter } from "@/providers/sport-filter";
+import { useAuth } from "@/hooks/useAuth";
 import { EdgeDial, SectionHead, Sparkline, StatusBadge } from "@/components/bits";
 import { PickCard, selectionLabel } from "@/components/PickCard";
 import { fmtLine, fmtOdds, num, pct, signedPct, timeAgo } from "@/lib/format";
@@ -77,6 +78,8 @@ const PIPELINE = [
 
 export default function Home() {
   const { isVisible } = useSportFilter();
+  const { user } = useAuth();
+  const isPro = user?.plan === "pro" || user?.role === "admin";
   const { data: picks } = trpc.picks.list.useQuery(undefined, { refetchInterval: 20000 });
   const { data: perf } = trpc.performance.summary.useQuery();
   const top = (picks?.picks ?? [])
@@ -111,12 +114,21 @@ export default function Home() {
             >
               VIEW TODAY'S PICKS
             </Link>
-            <Link
-              to="/premium"
-              className="rounded-sm border border-primary/50 px-6 py-3 font-mono2 text-[11px] font-bold tracking-[0.16em] text-primary transition-colors hover:bg-live-dim"
-            >
-              GO PRO
-            </Link>
+            {isPro ? (
+              <Link
+                to="/ev"
+                className="rounded-sm border border-primary/50 px-6 py-3 font-mono2 text-[11px] font-bold tracking-[0.16em] text-primary transition-colors hover:bg-live-dim"
+              >
+                VIEW +EV BOARD
+              </Link>
+            ) : (
+              <Link
+                to="/premium"
+                className="rounded-sm border border-primary/50 px-6 py-3 font-mono2 text-[11px] font-bold tracking-[0.16em] text-primary transition-colors hover:bg-live-dim"
+              >
+                GO PRO
+              </Link>
+            )}
           </div>
           {perf && (
             <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-3 font-mono2">
@@ -302,20 +314,41 @@ export default function Home() {
           className="pointer-events-none absolute inset-0 opacity-30"
           style={{ background: "radial-gradient(600px 200px at 50% 0%, rgba(34,211,238,0.25), transparent 70%)" }}
         />
-        <p className="label-caps mb-3">The house has data. Now you do too.</p>
-        <h3 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
-          FULL AI EDGE · PLAYER PROPS · LIVE BETTING · AI ASSISTANT
-        </h3>
-        <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
-          Proprietary quantitative models. Real-time sportsbook markets. Advanced
-          AI intelligence. $19.99/month or $199/year.
-        </p>
-        <Link
-          to="/premium"
-          className="mt-6 inline-block rounded-sm bg-primary px-8 py-3 font-mono2 text-[11px] font-bold tracking-[0.16em] text-primary-foreground transition-transform hover:scale-[1.03]"
-        >
-          GO PRO — $19.99/MO
-        </Link>
+        {isPro ? (
+          <>
+            <p className="label-caps mb-3 text-warn">PRO PLAN ACTIVE</p>
+            <h3 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+              THE FULL TERMINAL IS YOURS
+            </h3>
+            <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
+              Unlimited picks, full AI Edge, player props, live model, AI assistant
+              and advanced tracking — all unlocked on your account.
+            </p>
+            <Link
+              to="/assistant"
+              className="mt-6 inline-block rounded-sm bg-primary px-8 py-3 font-mono2 text-[11px] font-bold tracking-[0.16em] text-primary-foreground transition-transform hover:scale-[1.03]"
+            >
+              ASK THE AI ASSISTANT
+            </Link>
+          </>
+        ) : (
+          <>
+            <p className="label-caps mb-3">The house has data. Now you do too.</p>
+            <h3 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+              FULL AI EDGE · PLAYER PROPS · LIVE BETTING · AI ASSISTANT
+            </h3>
+            <p className="mx-auto mt-3 max-w-lg text-sm text-muted-foreground">
+              Proprietary quantitative models. Real-time sportsbook markets. Advanced
+              AI intelligence. $19.99/month or $199/year.
+            </p>
+            <Link
+              to="/premium"
+              className="mt-6 inline-block rounded-sm bg-primary px-8 py-3 font-mono2 text-[11px] font-bold tracking-[0.16em] text-primary-foreground transition-transform hover:scale-[1.03]"
+            >
+              GO PRO — $19.99/MO
+            </Link>
+          </>
+        )}
       </section>
     </div>
   );
