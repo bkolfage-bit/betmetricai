@@ -253,7 +253,7 @@ function FeedDashboard() {
                 : "border-[#fbbf24]/50 bg-warn-dim text-warn",
             )}
           >
-            MODE: {data.mode === "live" ? "LIVE FEED" : "DEMO SIMULATOR"} — SWITCH
+            MODE: {data.mode === "live" ? "LIVE FEED" : "PAUSED"} — SWITCH
           </button>
         </div>
       </div>
@@ -489,7 +489,7 @@ export default function Admin() {
           <p className="label-caps mb-4">Feed & model status</p>
           <div className="space-y-3 font-mono2 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">ODDS FEED (DEMO SIMULATOR)</span>
+              <span className="text-muted-foreground">ODDS FEED</span>
               <span className={cn("flex items-center gap-2 font-bold", feedOk ? "text-pos" : "text-neg")}>
                 <span className={cn("led", feedOk ? "led-pos" : "led-neg")} />
                 {feedOk ? `HEALTHY · ticked ${timeAgo(data.lastTick)}` : "STALLED"}
@@ -497,7 +497,7 @@ export default function Admin() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">DATA MODE</span>
-              <span className="font-bold text-warn">DEMO — SIMULATED DATA</span>
+              <span className="font-bold text-pos">LIVE — PRODUCTION FEED</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">MODELS</span>

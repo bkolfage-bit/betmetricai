@@ -113,28 +113,17 @@ export function Freshness({
   );
 }
 
-export function DemoBadge() {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-sm border border-[#fbbf24]/40 bg-warn-dim px-2 py-0.5 font-mono2 text-[9px] font-bold uppercase tracking-[0.18em] text-warn">
-      Demo data
-    </span>
-  );
-}
-
 /**
  * Data-source badge — the honest label for where odds come from.
- *  - DEMO mode: amber DEMO DATA (simulator)
- *  - LIVE mode + healthy feed: green LIVE ODDS
- *  - LIVE mode + feed trouble: red LIVE ODDS TEMPORARILY UNAVAILABLE
+ *  - healthy feed: green LIVE ODDS
+ *  - feed trouble: red LIVE ODDS TEMPORARILY UNAVAILABLE
  */
 export function DataSourceBadge({
-  mode,
   degraded,
 }: {
-  mode: "demo" | "live";
+  mode?: "demo" | "live";
   degraded?: boolean;
 }) {
-  if (mode === "demo") return <DemoBadge />;
   if (degraded) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-sm border border-[#f87171]/40 bg-neg-dim px-2 py-0.5 font-mono2 text-[9px] font-bold uppercase tracking-[0.18em] text-neg">

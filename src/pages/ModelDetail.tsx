@@ -285,7 +285,7 @@ export default function ModelDetail() {
       </section>
 
       <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
-        * Trained and validated on the DEMO dataset via the real pipeline. Backtests are strictly
+        * Trained and validated via the real pipeline. Backtests are strictly
         chronological — no future information reaches training. Past performance never guarantees
         future results.
       </p>

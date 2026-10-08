@@ -1,6 +1,6 @@
 /**
  * Live odds-feed status via SSE with automatic tRPC-polling fallback.
- * Drives the LIVE ODDS / DEMO DATA badge and staleness states.
+ * Drives the LIVE ODDS badge and staleness states.
  */
 import { useEffect, useState } from "react";
 import { trpc } from "@/providers/trpc";

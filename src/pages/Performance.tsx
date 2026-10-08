@@ -164,8 +164,7 @@ export default function Performance() {
 
       <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
         * Historical results are graded against closing lines and stored with full
-        timestamps. Past performance never guarantees future results. The current
-        dataset is simulated DEMO DATA flowing through the real analytics pipeline.
+        timestamps. Past performance never guarantees future results.
       </p>
     </div>
   );

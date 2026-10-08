@@ -83,7 +83,7 @@ export default function Sports() {
         ))}
       </div>
       <p className="font-mono2 text-[10px] tracking-[0.14em] text-muted-foreground">
-        MODEL WEIGHTS ARE OPTIMIZED ON CHRONOLOGICAL VALIDATION DATA. DEMO DATASET — NOT BETTING ADVICE.
+        MODEL WEIGHTS ARE OPTIMIZED ON CHRONOLOGICAL VALIDATION DATA. NOT BETTING ADVICE.
       </p>
     </div>
   );

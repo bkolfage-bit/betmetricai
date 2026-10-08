@@ -239,7 +239,7 @@ export default function Home() {
           </p>
         </div>
         <div className="flex flex-col justify-center gap-3 bg-secondary p-6 font-mono2 text-xs sm:p-8">
-          <p className="label-caps mb-1">Example — 10,000 simulated games</p>
+          <p className="label-caps mb-1">Example — 10,000 Monte Carlo simulations</p>
           {[
             ["TEAM A WINS", "6,180", "text-pos"],
             ["TEAM B WINS", "3,820", "text-muted-foreground"],

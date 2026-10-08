@@ -449,9 +449,8 @@ export default function Layout() {
         </div>
         <div className="hairline-t mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-2 px-5 py-4">
           <p className="font-mono2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
-            © 2026 BetMetricAi · {feed.mode === "live"
-              ? "Odds: The Odds API (production feed) · Predictions: quantitative models"
-              : "All displayed data is simulated DEMO DATA through the live pipeline"}
+            © 2026 BetMetricAi · Odds: The Odds API (production feed) ·
+            Predictions: quantitative models
           </p>
           <p className="font-mono2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
             Prediction ≠ betting value
