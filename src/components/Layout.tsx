@@ -341,6 +341,29 @@ export default function Layout() {
         </div>
       </header>
 
+      {/* mobile/tablet: full section nav — swipeable strip mirroring the desktop top nav */}
+      <nav className="border-b border-border/60 bg-card/40 lg:hidden">
+        <div className="mx-auto flex max-w-[1500px] items-stretch gap-0.5 overflow-x-auto px-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {NAV.map((n) => (
+            <NavLink
+              key={n.to}
+              to={n.to}
+              end={n.to === "/"}
+              className={({ isActive }) =>
+                cn(
+                  "flex min-h-[40px] items-center whitespace-nowrap border-b-2 px-2.5 font-mono2 text-[9px] font-semibold tracking-[0.12em] transition-colors",
+                  isActive
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
+                )
+              }
+            >
+              {n.label}
+            </NavLink>
+          ))}
+        </div>
+      </nav>
+
       {/* meta strip: freshness (always) + ticker (desktop only) */}
       <div className="border-b border-border/60 bg-background/60">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between px-3 py-1 sm:px-5">
