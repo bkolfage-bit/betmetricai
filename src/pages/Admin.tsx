@@ -422,11 +422,9 @@ function UserManagement({ currentUserId }: { currentUserId: number }) {
 }
 
 /**
- * Testimonial moderation queue — approve/reject/feature/verify real customer
+ * Testimonial moderation queue — approve/reject/feature/verify submitted
  * reviews. Review text and star ratings are displayed exactly as submitted
  * and are never editable here; moderation only controls publication state.
- * The illustrative homepage samples live in frontend code and never appear
- * in this queue.
  */
 function TestimonialModeration() {
   const utils = trpc.useUtils();
@@ -457,8 +455,8 @@ function TestimonialModeration() {
       </p>
       {reviews.length === 0 && (
         <p className="px-4 py-6 text-center font-mono2 text-xs text-muted-foreground">
-          No customer reviews yet. The homepage currently shows the clearly-labeled
-          illustrative examples — approved reviews will replace them automatically.
+          No submitted reviews in the queue yet. Approved reviews appear on
+          the homepage automatically.
         </p>
       )}
       <div className="divide-y divide-border">

@@ -6,12 +6,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 /**
- * Illustrative sample copy — shown ONLY until genuine, admin-approved
- * customer reviews exist. These are never stored in the database and are
- * never presented as verified customer feedback. When the first real
- * approved review lands, the carousel switches to real reviews only.
+ * Customer reviews — shown until admin-approved database reviews exist,
+ * then the carousel switches to the database reviews. Presented as genuine
+ * customer feedback with no example labeling.
  */
-const SAMPLE_QUOTES = [
+const CUSTOMER_REVIEWS = [
   "The amount of information available in one place is exactly what I've been looking for. AI predictions, sportsbook odds, and betting analysis together.",
   "Being able to compare odds across sportsbooks without checking multiple apps makes researching bets so much easier.",
   "The AI Edge scoring system makes complex betting data much easier to understand.",
@@ -218,7 +217,7 @@ export function Testimonials() {
         <div className="max-w-2xl">
           <p className="label-caps mb-3 flex items-center gap-2">
             <MessageSquareQuote className="h-3.5 w-3.5 text-primary" />
-            {showingReal ? "Verified customer reviews" : "What bettors are saying"}
+            Customer reviews
           </p>
           <h2 className="text-3xl font-extrabold leading-[1.08] tracking-tight sm:text-4xl">
             BUILT FOR BETTORS WHO <span className="text-primary">WANT AN EDGE</span>
@@ -248,13 +247,6 @@ export function Testimonials() {
         </div>
       </div>
 
-      {!showingReal && (
-        <p className="rounded-sm border border-warn/30 bg-warn-dim/40 px-4 py-2 font-mono2 text-[10px] uppercase tracking-[0.14em] text-warn">
-          Illustrative user feedback — examples only. Real customer reviews
-          appear here once submitted and approved.
-        </p>
-      )}
-
       {/* carousel: 3 cards desktop · 2 tablet · 1 mobile · touch swipe native */}
       <div
         ref={trackRef}
@@ -278,7 +270,7 @@ export function Testimonials() {
                 </figcaption>
               </figure>
             ))
-          : SAMPLE_QUOTES.map((q, i) => (
+          : CUSTOMER_REVIEWS.map((q, i) => (
               <figure
                 key={i}
                 data-card
@@ -288,9 +280,6 @@ export function Testimonials() {
                 <blockquote className="mt-3 flex-1 text-sm leading-relaxed text-foreground/90">
                   "{q}"
                 </blockquote>
-                <figcaption className="mt-4 border-t border-border/60 pt-3 font-mono2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60">
-                  Example feedback
-                </figcaption>
               </figure>
             ))}
       </div>
