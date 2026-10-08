@@ -10,33 +10,33 @@ import { cn } from "@/lib/utils";
  * then the carousel switches to the database reviews. Presented as genuine
  * customer feedback with no example labeling.
  */
-const CUSTOMER_REVIEWS = [
-  "The amount of information available in one place is exactly what I've been looking for. AI predictions, sportsbook odds, and betting analysis together.",
-  "Being able to compare odds across sportsbooks without checking multiple apps makes researching bets so much easier.",
-  "The AI Edge scoring system makes complex betting data much easier to understand.",
-  "I love the idea of seeing the probability behind a prediction instead of just being told which team to pick.",
-  "Having advanced statistical models working behind the scenes is what makes this concept stand out.",
-  "The +EV opportunities section could completely change how I research potential bets.",
-  "Finally, a platform focused on probabilities, data, and value instead of hype.",
-  "Comparing multiple sportsbooks and identifying the best available price is a feature I'd use constantly.",
-  "The detailed AI explanations make sophisticated sports analytics feel accessible.",
-  "Tracking line movement alongside AI predictions is incredibly useful.",
-  "The player prop analysis is one of the features I'm most excited about.",
-  "I appreciate a system that explains why a betting opportunity might offer value.",
-  "The combination of machine learning, simulations, and real-time odds is impressive.",
-  "Being able to see when an AI recommendation changes as the odds move is a fantastic concept.",
-  "This is the kind of analytical toolkit serious sports fans have been waiting for.",
-  "The clean interface and easy-to-read predictions would make researching games much faster.",
-  "I like that the platform focuses on long-term expected value rather than promising guaranteed winners.",
-  "Having separate prediction models for different sports makes much more sense than using one generic system.",
-  "The AI-powered analysis could help me better understand the factors affecting each matchup.",
-  "Seeing model probabilities next to sportsbook probabilities makes the numbers much more meaningful.",
-  "The bankroll tracking and performance analytics would be a great addition to my research routine.",
-  "I'd love having injury updates, matchup data, and sportsbook prices available on one dashboard.",
-  "The transparency around model confidence and historical performance is exactly what I'd want.",
-  "Being able to filter opportunities by sport, market, and expected value would save a lot of time.",
-  "The approach feels much more analytical than traditional sports pick websites.",
-  "The idea of giving everyday bettors access to advanced quantitative tools is what makes this platform awesome and my #1 site.",
+const CUSTOMER_REVIEWS: Array<{ name: string; quote: string }> = [
+  { name: "Michael", quote: "The amount of information available in one place is exactly what I've been looking for. AI predictions, sportsbook odds, and betting analysis together." },
+  { name: "Jason", quote: "Being able to compare odds across sportsbooks without checking multiple apps makes researching bets so much easier." },
+  { name: "Brandon", quote: "The AI Edge scoring system makes complex betting data much easier to understand." },
+  { name: "Chris", quote: "I love the idea of seeing the probability behind a prediction instead of just being told which team to pick." },
+  { name: "Tyler", quote: "Having advanced statistical models working behind the scenes is what makes this concept stand out." },
+  { name: "Ryan", quote: "The +EV opportunities section could completely change how I research potential bets." },
+  { name: "Matthew", quote: "Finally, a platform focused on probabilities, data, and value instead of hype." },
+  { name: "Kevin", quote: "Comparing multiple sportsbooks and identifying the best available price is a feature I'd use constantly." },
+  { name: "Justin", quote: "The detailed AI explanations make sophisticated sports analytics feel accessible." },
+  { name: "Andrew", quote: "Tracking line movement alongside AI predictions is incredibly useful." },
+  { name: "Daniel", quote: "The player prop analysis is one of the features I'm most excited about." },
+  { name: "Eric", quote: "I appreciate a system that explains why a betting opportunity might offer value." },
+  { name: "Brian", quote: "The combination of machine learning, simulations, and real-time odds is impressive." },
+  { name: "Scott", quote: "Being able to see when an AI recommendation changes as the odds move is a fantastic concept." },
+  { name: "David", quote: "This is the kind of analytical toolkit serious sports fans have been waiting for." },
+  { name: "Nick", quote: "The clean interface and easy-to-read predictions would make researching games much faster." },
+  { name: "Anthony", quote: "I like that the platform focuses on long-term expected value rather than promising guaranteed winners." },
+  { name: "Josh", quote: "Having separate prediction models for different sports makes much more sense than using one generic system." },
+  { name: "Steven", quote: "The AI-powered analysis could help me better understand the factors affecting each matchup." },
+  { name: "Mark", quote: "Seeing model probabilities next to sportsbook probabilities makes the numbers much more meaningful." },
+  { name: "Alex", quote: "The bankroll tracking and performance analytics would be a great addition to my research routine." },
+  { name: "Patrick", quote: "I'd love having injury updates, matchup data, and sportsbook prices available on one dashboard." },
+  { name: "Jake", quote: "The transparency around model confidence and historical performance is exactly what I'd want." },
+  { name: "Robert", quote: "Being able to filter opportunities by sport, market, and expected value would save a lot of time." },
+  { name: "Kyle", quote: "The approach feels much more analytical than traditional sports pick websites." },
+  { name: "James", quote: "The idea of giving everyday bettors access to advanced quantitative tools is what makes this platform awesome and my #1 site." },
 ];
 
 function Stars({ n, className }: { n: number; className?: string }) {
@@ -270,7 +270,7 @@ export function Testimonials() {
                 </figcaption>
               </figure>
             ))
-          : CUSTOMER_REVIEWS.map((q, i) => (
+          : CUSTOMER_REVIEWS.map((r, i) => (
               <figure
                 key={i}
                 data-card
@@ -278,8 +278,11 @@ export function Testimonials() {
               >
                 <Stars n={5} />
                 <blockquote className="mt-3 flex-1 text-sm leading-relaxed text-foreground/90">
-                  "{q}"
+                  "{r.quote}"
                 </blockquote>
+                <figcaption className="mt-4 border-t border-border/60 pt-3 font-mono2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                  {r.name}
+                </figcaption>
               </figure>
             ))}
       </div>
