@@ -92,11 +92,18 @@ export default function PlusEV() {
         )}
       </div>
 
-      <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
-        * EV is expected value per 1 unit staked, computed from the model probability
-        and the best available price after removing the vig. +EV does not mean the
-        bet will win — it means the price is in your favor over the long run.
-      </p>
+      <div className="flex flex-col gap-2">
+        <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
+          * EV is expected value per 1 unit staked, computed from the model probability
+          and the best available price after removing the vig. +EV does not mean the
+          bet will win — it means the price is in your favor over the long run.
+        </p>
+        <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
+          * What is Vig? Vig is the sportsbook's built-in profit margin. Our AI removes
+          this margin when analyzing market probabilities, helping reveal the true odds
+          behind the sportsbook's pricing.
+        </p>
+      </div>
 
       {(data?.lockedCount ?? 0) > 0 && (
         <Link
