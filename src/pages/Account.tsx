@@ -97,9 +97,7 @@ export default function Account() {
         <div className="flex-1">
           <p className="flex items-center gap-2 text-lg font-bold">
             {user.name ?? "Bettor"}
-            {user.hasPassword && <ChangePassword />}
-
-      {user.role === "admin" && (
+            {user.role === "admin" && (
               <span className="flex items-center gap-1 rounded-sm border border-[#fbbf24]/40 bg-warn-dim px-1.5 py-0.5 font-mono2 text-[9px] font-bold text-warn">
                 <Shield className="h-3 w-3" /> ADMIN
               </span>
@@ -117,6 +115,8 @@ export default function Account() {
           <LogOut className="h-3.5 w-3.5" /> SIGN OUT
         </button>
       </div>
+
+      {user.hasPassword && <ChangePassword />}
 
       <div className="panel rounded-sm p-6">
         <p className="label-caps mb-3">Subscription</p>
