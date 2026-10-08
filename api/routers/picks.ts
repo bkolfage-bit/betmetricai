@@ -118,7 +118,10 @@ async function buildPickBoard(sport?: string) {
       };
     })
     // LIVE mode: only real-odds events — demo picks never mix in —
-    // and nothing beyond the 8-day forecast horizon is analyzed
+    // and nothing beyond the 8-day forecast horizon is analyzed.
+    // FINAL events are excluded — the moment a game ends its picks are
+    // graded into pick_history (AI Performance) and clear off the board.
+    .filter((r) => r.event.status !== "final")
     .filter((r) => !live || r.event.isDemo === false)
     .filter((r) => !live || r.event.startTime.getTime() <= horizonCutoff)
     .filter((r) => !sport || r.sportCode === sport);

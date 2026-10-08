@@ -85,6 +85,14 @@ export const parlaysRouter = createRouter({
         .innerJoin(sports, eq(events.sportId, sports.id));
       const evMap = new Map(evRows.map((r) => [r.event.id, r]));
 
+      // never build a parlay on a game that's already over — final events
+      // are graded into history and must not appear as live +EV positions
+      usable = usable.filter((v) => {
+        const p = pickMap.get(v.pickId);
+        const ctx = p ? evMap.get(p.eventId) : undefined;
+        return ctx ? ctx.event.status !== "final" : false;
+      });
+
       // respect the user's global sport focus
       if (input.sports && input.sports.length > 0) {
         const allowed = new Set(input.sports);
