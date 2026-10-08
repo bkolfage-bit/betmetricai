@@ -33,6 +33,7 @@ import {
 import { getSportModel } from "../models";
 import type { SportModel } from "../models/interface";
 import { recomputeEventPicks } from "../engine/recompute";
+import { gradeEventPicks } from "./grading";
 import { marketProbability } from "../engine/markets";
 import { americanToDecimal, americanToImplied, noVigN } from "../engine/probability";
 import { getOddsProvider, hasOddsProvider } from "../providers";
@@ -798,8 +799,8 @@ async function ensureLivePrediction(
  * fields, clock label, live predictions and pick repricing for live games,
  * plus closing-line capture when a game goes final.
  */
-export async function syncScores(sportCode: string): Promise<{ updated: number; liveNow: number; finals: number; errors: string[] }> {
-  const out = { updated: 0, liveNow: 0, finals: 0, errors: [] as string[] };
+export async function syncScores(sportCode: string): Promise<{ updated: number; liveNow: number; finals: number; graded: number; errors: string[] }> {
+  const out = { updated: 0, liveNow: 0, finals: 0, graded: 0, errors: [] as string[] };
   const db = getDb();
   const provider = getOddsProvider();
   const keys = await db
@@ -809,9 +810,10 @@ export async function syncScores(sportCode: string): Promise<{ updated: number; 
   if (keys.length === 0) return out;
 
   const now = new Date();
-  // events that could plausibly be live/final: started within the last 12h
-  // and not yet marked final
-  const windowStart = new Date(now.getTime() - 12 * 3600_000);
+  // events that could plausibly be live/final: started within the last 24h
+  // and not yet marked final (wide window so a few hours of downtime can
+  // never strand a completed game ungraded)
+  const windowStart = new Date(now.getTime() - 24 * 3600_000);
   const tracked = await db
     .select()
     .from(events)
@@ -830,7 +832,7 @@ export async function syncScores(sportCode: string): Promise<{ updated: number; 
   for (const keyRow of keys) {
     let scores;
     try {
-      const res = await provider.getScores(keyRow.providerSportKey, { daysFrom: 1 });
+      const res = await provider.getScores(keyRow.providerSportKey, { daysFrom: 2 });
       await logUsage(`/v4/sports/${keyRow.providerSportKey}/scores`, keyRow.providerSportKey, res.quota, res.latencyMs, "ok");
       scores = res.data;
     } catch (e) {
@@ -864,6 +866,13 @@ export async function syncScores(sportCode: string): Promise<{ updated: number; 
         }).where(eq(events.id, ev.id));
         out.finals++;
         out.updated++;
+        // settle every published pick for this event into pick_history
+        // (append-only; failures are reported, never papered over)
+        try {
+          out.graded += await gradeEventPicks(ev.id);
+        } catch (e) {
+          out.errors.push(`grade event ${ev.id}: ${e instanceof Error ? e.message : String(e)}`);
+        }
         continue;
       }
       if (sc.started && ev.status === "scheduled") {

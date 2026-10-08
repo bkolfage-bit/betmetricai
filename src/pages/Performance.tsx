@@ -6,7 +6,11 @@ import { cn } from "@/lib/utils";
 
 export default function Performance() {
   const { sport } = useSportFilter();
-  const { data } = trpc.performance.summary.useQuery(sport ? { sport } : undefined);
+  const { data } = trpc.performance.summary.useQuery(
+    sport ? { sport } : undefined,
+    // picks settle automatically as games go final — keep the audit trail fresh
+    { refetchInterval: 60_000 },
+  );
   if (!data) {
     return <div className="panel animate-pulse rounded-sm p-10 text-center font-mono2 text-xs text-muted-foreground">LOADING AUDIT TRAIL…</div>;
   }

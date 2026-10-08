@@ -333,6 +333,9 @@ export const pickHistory = mysqlTable("pick_history", {
   units: decimal("units", { precision: 6, scale: 2 }).notNull(),
   clv: decimal("clv", { precision: 6, scale: 3 }).notNull(), // % closing line value
   placedAt: timestamp("placedAt").notNull(),
+  // Grading idempotency key (plain column, no FK: graded history must
+  // survive any later pick cleanup — history is never altered).
+  pickId: bigint("pickId", { mode: "number", unsigned: true }),
 });
 
 /* ------------------------------ user features ---------------------------- */
