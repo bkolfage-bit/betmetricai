@@ -6,6 +6,7 @@ import { EdgeGauge, Freshness, StatusBadge } from "@/components/bits";
 import { fmtLine, fmtOdds, fmtTime, num, pct, signedPct, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { ChevronDown, Lock, TrendingUp } from "lucide-react";
+import { SaveButton } from "@/components/SaveButton";
 import type { PickListRow } from "@contracts/router-types";
 
 type PickRow = PickListRow;
@@ -128,9 +129,10 @@ export function PickCard({ row, defaultOpen = false }: { row: PickRow; defaultOp
 
   return (
     <div className="panel overflow-hidden rounded-sm transition-colors hover:border-primary/30">
+      <div className="flex">
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full flex-col gap-3 px-4 py-3 text-left min-h-[44px]"
+        className="flex min-w-0 flex-1 flex-col gap-3 px-4 py-3 text-left min-h-[44px]"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 font-mono2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -206,6 +208,11 @@ export function PickCard({ row, defaultOpen = false }: { row: PickRow; defaultOp
           </div>
         </div>
       </button>
+      {/* save to your list — far right, always visible */}
+      <div className="flex shrink-0 items-center border-l border-border/60 px-3">
+        <SaveButton pickId={row.pick.id} />
+      </div>
+      </div>
       {open && (
         <div className="hairline-t animate-fade-up px-4">
           <VersionTimeline pickId={row.pick.id} />

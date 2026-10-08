@@ -16,6 +16,7 @@ import {
   CircleUser,
   Crosshair,
   Dices,
+  Heart,
   Home,
   Info,
   LayoutGrid,
@@ -39,6 +40,7 @@ const NAV_BASE = [
   { to: "/parlays", label: "PARLAYS" },
   { to: "/line-movement", label: "LINE MOVEMENT" },
   { to: "/markets", label: "PRED MKTS" },
+  { to: "/saved", label: "SAVED" },
   { to: "/assistant", label: "AI ASSISTANT" },
   { to: "/tracker", label: "BET TRACKER" },
   { to: "/performance", label: "PERFORMANCE" },
@@ -59,6 +61,7 @@ function navFor(plan?: string, role?: string) {
 const MOBILE_NAV = [
   { to: "/", label: "HOME", icon: Home },
   { to: "/picks", label: "PICKS", icon: Crosshair },
+  { to: "/saved", label: "SAVED", icon: Heart },
   { to: "/live", label: "LIVE", icon: Radio },
   { to: "/ev", label: "+EV", icon: Activity },
   { to: "/tracker", label: "TRACKER", icon: Wallet },
@@ -75,6 +78,7 @@ const MOBILE_MENU_SECTIONS = [
       { to: "/ev", label: "+EV Opportunities", icon: Activity, pro: false },
       { to: "/sports", label: "Sports & Models", icon: Trophy, pro: false },
       { to: "/markets", label: "Prediction Markets", icon: Scale, pro: false },
+      { to: "/saved", label: "Saved Picks", icon: Heart, pro: false },
     ],
   },
   {

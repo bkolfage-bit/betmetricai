@@ -340,6 +340,22 @@ export const pickHistory = mysqlTable("pick_history", {
 
 /* ------------------------------ user features ---------------------------- */
 
+/**
+ * Saved picks — a user's personal watchlist of AI picks (heart button on
+ * every pick card). References the pick, not a version: versions rotate as
+ * the market moves, but the saved pick itself must persist. Only saved
+ * while the event is not final; graded results are looked up from
+ * pick_history at read time.
+ */
+export const savedPicks = mysqlTable("saved_picks", {
+  id: serial("id").primaryKey(),
+  userId: bigint("userId", { mode: "number", unsigned: true })
+    .notNull()
+    .references(() => users.id),
+  pickId: bigint("pickId", { mode: "number", unsigned: true }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export const userBets = mysqlTable("user_bets", {
   id: serial("id").primaryKey(),
   userId: bigint("userId", { mode: "number", unsigned: true })

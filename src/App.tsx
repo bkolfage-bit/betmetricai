@@ -12,6 +12,7 @@ import Sports from "./pages/Sports";
 import ModelDetail from "./pages/ModelDetail";
 import Assistant from "./pages/Assistant";
 import Tracker from "./pages/Tracker";
+import Saved from "./pages/Saved";
 import Performance from "./pages/Performance";
 import PredictionMarkets from "./pages/PredictionMarkets";
 import Premium from "./pages/Premium";
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/sports/:modelId" element={<AdminGate><ModelDetail /></AdminGate>} />
         <Route path="/assistant" element={<Assistant />} />
         <Route path="/tracker" element={<Tracker />} />
+        <Route path="/saved" element={<Saved />} />
         <Route path="/performance" element={<Performance />} />
         <Route path="/markets" element={<PredictionMarkets />} />
         <Route path="/premium" element={<Premium />} />

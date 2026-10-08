@@ -9,6 +9,7 @@ import { parlaysRouter, adminRouter } from "./routers/parlays";
 import { modelsRouter } from "./routers/models";
 import { feedRouter } from "./routers/feed";
 import { pmarketsRouter } from "./routers/pmarkets";
+import { savedRouter } from "./routers/saved";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -24,6 +25,7 @@ export const appRouter = createRouter({
   models: modelsRouter,
   feed: feedRouter,
   pmarkets: pmarketsRouter,
+  saved: savedRouter,
 });
 
 export type AppRouter = typeof appRouter;
