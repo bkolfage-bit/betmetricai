@@ -391,7 +391,11 @@ export default function Layout() {
       {/* meta strip: freshness (always) + ticker (desktop only) */}
       <div className="border-b border-border/60 bg-background/60">
         <div className="mx-auto flex max-w-[1500px] items-center justify-between px-3 py-1 sm:px-5">
-          <Freshness at={fresh?.lastOddsAt ?? null} live={location.pathname === "/live"} />
+          <Freshness
+            at={fresh?.lastOddsAt ?? null}
+            live={location.pathname === "/live"}
+            expectedSec={fresh?.expectedPollSec ?? null}
+          />
           <span className="flex items-center gap-3">
             <span className="sm:hidden">
               <DataSourceBadge mode={feed.mode} degraded={feedDegraded} />

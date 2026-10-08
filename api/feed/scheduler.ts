@@ -19,6 +19,7 @@ import {
   FORECAST_HORIZON_DAYS,
   getFeedMode,
   getQuotaState,
+  pollTierFor,
   syncOutrights,
   syncScores,
   syncSportOdds,
@@ -42,25 +43,6 @@ let lastPmRun = 0;
 let lastV2Run = 0;
 let lastHealthRun = 0;
 let lastSweepRun = 0;
-
-interface TierDef {
-  maxAheadMs: number;
-  intervalMs: number;
-}
-
-const TIERS: TierDef[] = [
-  { maxAheadMs: 0, intervalMs: 60_000 }, // live
-  { maxAheadMs: 2 * 3600_000, intervalMs: 2 * 60_000 },
-  { maxAheadMs: 6 * 3600_000, intervalMs: 5 * 60_000 },
-  { maxAheadMs: 24 * 3600_000, intervalMs: 15 * 60_000 },
-  { maxAheadMs: Infinity, intervalMs: 30 * 60_000 },
-];
-
-function tierFor(startTime: Date, now: number): TierDef {
-  const ahead = startTime.getTime() - now;
-  for (const t of TIERS) if (ahead <= t.maxAheadMs) return t;
-  return TIERS[TIERS.length - 1];
-}
 
 let timer: NodeJS.Timeout | null = null;
 let running = false;
@@ -159,7 +141,7 @@ async function tick(): Promise<void> {
       const due: string[] = [];
       for (const ev of rows) {
         if (!ev.providerEventId) continue;
-        const tier = tierFor(ev.startTime, now);
+        const tier = pollTierFor(ev.startTime, now);
         const interval = tier.intervalMs * quota.intervalMultiplier;
         const lastSync = ev.oddsSyncedAt?.getTime() ?? 0;
         if (now - lastSync >= interval) due.push(ev.providerEventId);

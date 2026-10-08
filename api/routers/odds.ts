@@ -9,11 +9,16 @@ import {
   sportsbooks,
   teams,
 } from "@db/schema";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { oddsBoard } from "../engine/recompute";
 import type { Market } from "../lib/edge";
-import { FORECAST_HORIZON_DAYS, getFeedMode } from "../feed/service";
+import {
+  FORECAST_HORIZON_DAYS,
+  getFeedMode,
+  getQuotaState,
+  pollTierFor,
+} from "../feed/service";
 
 const homeTeams = alias(teams, "home_teams");
 const awayTeams = alias(teams, "away_teams");
@@ -118,10 +123,42 @@ export const oddsRouter = createRouter({
         .where(eq(adminConfig.key, "sim_last_tick"));
       lastTick = tick[0]?.value ?? null;
     }
+
+    // How often new odds are actually expected right now: the scheduler
+    // polls on adaptive tiers (60s for live games up to 30min for games
+    // days away, stretched by quota protection). The UI compares the data
+    // age against THIS interval — not a fixed threshold — so a 15-minute
+    // polling cadence doesn't read as "delayed" between polls.
+    let expectedPollSec: number | null = null;
+    if (mode === "live") {
+      const quota = await getQuotaState();
+      if (Number.isFinite(quota.intervalMultiplier)) {
+        const now = Date.now();
+        const soonest = await db
+          .select({ startTime: events.startTime })
+          .from(events)
+          .where(
+            and(
+              eq(events.provider, "THE_ODDS_API"),
+              inArray(events.status, ["scheduled", "live"]),
+              gte(events.startTime, new Date(now - 4 * 3600_000)),
+            ),
+          )
+          .orderBy(asc(events.startTime))
+          .limit(1);
+        const tier = soonest[0]
+          ? pollTierFor(soonest[0].startTime, now)
+          : { intervalMs: 30 * 60_000 }; // nothing upcoming: slowest cadence
+        expectedPollSec = Math.round(
+          (tier.intervalMs * quota.intervalMultiplier) / 1000,
+        );
+      }
+    }
     return {
       dataMode: mode === "live" ? "LIVE" : "DEMO",
       lastTick,
       lastOddsAt,
+      expectedPollSec,
       serverTime: new Date(),
     };
   }),

@@ -53,6 +53,28 @@ const BASELINE_KEY = "odds_quota_baseline";
 export const FORECAST_HORIZON_DAYS = 8;
 const HORIZON_MS = FORECAST_HORIZON_DAYS * 24 * 60 * 60 * 1000;
 
+/* ------------------------- adaptive poll tiers -------------------------- */
+/* Shared by the scheduler (deciding what is due) and the freshness endpoint
+ * (telling the UI how often new odds are actually expected). */
+export interface PollTier {
+  maxAheadMs: number;
+  intervalMs: number;
+}
+
+export const POLL_TIERS: PollTier[] = [
+  { maxAheadMs: 0, intervalMs: 60_000 }, // live
+  { maxAheadMs: 2 * 3600_000, intervalMs: 2 * 60_000 },
+  { maxAheadMs: 6 * 3600_000, intervalMs: 5 * 60_000 },
+  { maxAheadMs: 24 * 3600_000, intervalMs: 15 * 60_000 },
+  { maxAheadMs: Infinity, intervalMs: 30 * 60_000 },
+];
+
+export function pollTierFor(startTime: Date, now: number): PollTier {
+  const ahead = startTime.getTime() - now;
+  for (const t of POLL_TIERS) if (ahead <= t.maxAheadMs) return t;
+  return POLL_TIERS[POLL_TIERS.length - 1];
+}
+
 /* ------------------------------- quota ---------------------------------- */
 
 export type QuotaTier = "normal" | "conservative" | "minimal" | "critical" | "suspended";

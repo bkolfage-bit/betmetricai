@@ -157,6 +157,7 @@ export function PickCard({ row, defaultOpen = false }: { row: PickRow; defaultOp
             at={feed?.lastTick ?? null}
             live={live}
             text={`pick v${v.version} · ${timeAgo(v.createdAt)}`}
+            expectedSec={feed?.expectedPollSec ?? null}
           />
         </div>
 
