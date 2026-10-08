@@ -4,6 +4,7 @@ import { trpc } from "@/providers/trpc";
 import { useSportFilter } from "@/providers/sport-filter";
 import { useAuth } from "@/hooks/useAuth";
 import { EmptyState, SectionHead } from "@/components/bits";
+import { ProGate } from "@/components/ProTeaser";
 import { fmtLine, fmtOdds, fmtTime, num, pct, signedPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Trash2 } from "lucide-react";
@@ -90,10 +91,11 @@ function AddBetForm({ onDone }: { onDone: () => void }) {
 
 export default function Tracker() {
   const { user, isLoading } = useAuth();
+  const isPro = user?.plan === "pro" || user?.role === "admin";
   const { isVisible } = useSportFilter();
   const { data: allBets } = trpc.tracker.list.useQuery(undefined, { enabled: !!user });
   const bets = (allBets ?? []).filter((b) => isVisible(b.sport));
-  const { data: stats } = trpc.tracker.stats.useQuery(undefined, { enabled: !!user });
+  const { data: stats } = trpc.tracker.stats.useQuery(undefined, { enabled: !!user && isPro });
   const utils = trpc.useUtils();
   const settle = trpc.tracker.settle.useMutation({
     onSuccess: () => {
@@ -108,6 +110,21 @@ export default function Tracker() {
     },
   });
   const [showForm, setShowForm] = useState(false);
+
+  if (!isLoading && user && !isPro) {
+    return (
+      <div className="flex flex-col gap-6">
+        <SectionHead
+          title="Bet tracker"
+          sub="Log every bet you place and settle the results — your profit, ROI and whether you beat the closing line all build up automatically."
+        />
+        <ProGate
+          title="The bet tracker is part of Pro"
+          sub="Pro members log every bet, settle results, and watch profit, ROI and closing-line performance build up automatically — synced across devices."
+        />
+      </div>
+    );
+  }
 
   if (!isLoading && !user) {
     return (

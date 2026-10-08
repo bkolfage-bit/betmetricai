@@ -3,12 +3,16 @@ import { Link } from "react-router";
 import { Lock, Sparkles } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { EmptyState, SectionHead, StatusBadge } from "@/components/bits";
+import { ProTeaser } from "@/components/ProTeaser";
 import { useSportFilter } from "@/providers/sport-filter";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { fmtLine, fmtOdds, fmtTime, num, pct, signedPct, timeAgo } from "@/lib/format";
 
 export default function PlusEV() {
   const { sport } = useSportFilter();
+  const { user } = useAuth();
+  const isPro = user?.plan === "pro" || user?.role === "admin";
   const { data } = trpc.picks.list.useQuery(sport ? { sport } : undefined, { refetchInterval: 15000 });
   const [minEv, setMinEv] = useState(0);
 
@@ -39,6 +43,7 @@ export default function PlusEV() {
         }
       />
 
+      {isPro ? (
       <div className="panel overflow-x-auto rounded-sm">
         <table className="w-full min-w-[760px] border-collapse font-mono2 text-xs">
           <thead>
@@ -91,6 +96,57 @@ export default function PlusEV() {
           </div>
         )}
       </div>
+      ) : (
+        <ProTeaser
+          title="+EV opportunities are part of Pro"
+          sub="This live board lists every price our AI beats right now — selection, book, our win probability vs the book's, edge and expected profit. Upgrade to see it unblurred."
+        >
+          <div className="panel overflow-x-auto rounded-sm">
+            <table className="w-full min-w-[760px] border-collapse font-mono2 text-xs">
+              <thead>
+                <tr className="border-b border-border text-left">
+                  {["SPORT", "EVENT", "SELECTION", "BOOK", "PRICE", "OUR ODDS", "BOOK'S ODDS", "EDGE", "EV/UNIT", "AI EDGE", "STATUS"].map((h) => (
+                    <th key={h} className="label-caps px-3 py-2.5 font-normal">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((p) => {
+                  const v = p.version!;
+                  return (
+                    <tr key={p.pick.id} className="border-b border-border/60 last:border-0">
+                      <td className="px-3 py-2.5 font-bold text-muted-foreground">{p.sportCode}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">{p.away.abbr} @ {p.home.abbr}</td>
+                      <td className="px-3 py-2.5 font-bold whitespace-nowrap">
+                        {p.pick.market === "moneyline"
+                          ? `${p.pick.selection === "home" ? p.home.abbr : p.pick.selection === "draw" ? "Draw" : p.away.abbr} ML`
+                          : p.pick.market === "spread"
+                            ? `${p.pick.selection === "home" ? p.home.abbr : p.away.abbr} ${fmtLine(v.line)}`
+                            : `${p.pick.selection === "over" ? "Over" : "Under"} ${v.line}`}
+                      </td>
+                      <td className="px-3 py-2.5 text-muted-foreground">{p.book?.name}</td>
+                      <td className="px-3 py-2.5 tabular-nums">{fmtOdds(v.odds)}</td>
+                      <td className="px-3 py-2.5 tabular-nums font-bold">{pct(v.modelProb)}</td>
+                      <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{pct(v.impliedProb)}</td>
+                      <td className="px-3 py-2.5 tabular-nums text-pos">{signedPct(v.probEdge)}</td>
+                      <td className="px-3 py-2.5 tabular-nums font-bold text-pos">{signedPct(v.ev)}</td>
+                      <td className="px-3 py-2.5 tabular-nums font-bold text-primary">{v.edgeScore}</td>
+                      <td className="px-3 py-2.5"><StatusBadge status={v.status} /></td>
+                    </tr>
+                  );
+                })}
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={11} className="px-3 py-8 text-center text-muted-foreground">
+                      Loading the live board…
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </ProTeaser>
+      )}
 
       <div className="flex flex-col gap-2">
         <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
@@ -111,7 +167,7 @@ export default function PlusEV() {
         </p>
       </div>
 
-      {(data?.lockedCount ?? 0) > 0 && (
+      {isPro && (data?.lockedCount ?? 0) > 0 && (
         <Link
           to="/premium"
           className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-[#fbbf24]/40 bg-warn-dim px-5 py-4 transition-colors hover:border-[#fbbf24]/70"

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { useSportFilter } from "@/providers/sport-filter";
 import { SectionHead } from "@/components/bits";
+import { ProGate } from "@/components/ProTeaser";
+import { useAuth } from "@/hooks/useAuth";
 import { fmtOdds, pct, signedPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Layers, Sparkles } from "lucide-react";
@@ -13,10 +15,27 @@ export default function Parlays() {
   const [req, setReq] = useState<{ legs: number; targetOdds: number | null } | null>(null);
 
   const { sport } = useSportFilter();
+  const { user, isLoading } = useAuth();
+  const isPro = user?.plan === "pro" || user?.role === "admin";
   const { data, isFetching } = trpc.parlays.suggest.useQuery(
     { ...(req ?? { legs, targetOdds: null }), sports: sport ? [sport] : undefined },
-    { enabled: req !== null },
+    { enabled: req !== null && isPro },
   );
+
+  if (!isLoading && !isPro) {
+    return (
+      <div className="flex flex-col gap-6">
+        <SectionHead
+          title="AI parlay builder"
+          sub="Multi-leg combinations built from today's strongest value picks. We calculate the true combined win probability and expected return of every ticket — so you can see exactly what you're risking."
+        />
+        <ProGate
+          title="The AI parlay builder is part of Pro"
+          sub="Pro members generate multi-leg tickets from today's strongest value picks, with the true combined win probability and expected return calculated for every ticket."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
