@@ -341,6 +341,85 @@ function FeedDashboard() {
   );
 }
 
+
+/** Grant / revoke PRO access for any account (testers, beta users). */
+function UserManagement({ currentUserId }: { currentUserId: number }) {
+  const { data: users, refetch } = trpc.admin.listUsers.useQuery();
+  const setPlan = trpc.admin.setPlan.useMutation({
+    onSuccess: () => refetch(),
+  });
+  if (!users) return null;
+  return (
+    <section className="panel overflow-x-auto rounded-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-5">
+        <div>
+          <p className="label-caps">User access management</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Grant PRO to testers instantly — revoke just as fast. Changes apply on the user's next request.
+          </p>
+        </div>
+        <span className="font-mono2 text-[10px] text-muted-foreground">
+          {users.filter((u) => u.plan === "pro").length} PRO / {users.length} TOTAL
+        </span>
+      </div>
+      <table className="mt-4 w-full min-w-[680px] border-collapse font-mono2 text-xs">
+        <thead>
+          <tr className="border-y border-border text-left">
+            {["USER", "EMAIL", "AUTH", "ROLE", "PLAN", "LAST SIGN-IN", "ACCESS"].map((h) => (
+              <th key={h} className="label-caps px-5 py-2.5 font-normal">{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {users.map((u) => {
+            const isSelf = u.id === currentUserId;
+            return (
+              <tr key={u.id} className="border-b border-border/60 last:border-0">
+                <td className="px-5 py-2.5 font-bold">
+                  {u.name ?? "—"}
+                  {isSelf && <span className="ml-2 text-[9px] text-primary">YOU</span>}
+                </td>
+                <td className="px-5 py-2.5 text-muted-foreground">{u.email ?? "—"}</td>
+                <td className="px-5 py-2.5 uppercase text-muted-foreground">{u.authType}</td>
+                <td className="px-5 py-2.5">
+                  <span className={u.role === "admin" ? "font-bold text-warn" : "text-muted-foreground"}>
+                    {u.role.toUpperCase()}
+                  </span>
+                </td>
+                <td className="px-5 py-2.5">
+                  <span className={u.plan === "pro" ? "font-bold text-pos" : "text-muted-foreground"}>
+                    {u.plan.toUpperCase()}
+                  </span>
+                </td>
+                <td className="px-5 py-2.5 text-muted-foreground">{timeAgo(u.lastSignInAt)}</td>
+                <td className="px-5 py-2.5">
+                  <button
+                    disabled={setPlan.isPending || (isSelf && u.plan === "pro")}
+                    onClick={() =>
+                      setPlan.mutate({
+                        userId: u.id,
+                        plan: u.plan === "pro" ? "free" : "pro",
+                      })
+                    }
+                    className={cn(
+                      "min-h-[36px] rounded-sm border px-3 font-mono2 text-[10px] font-bold tracking-[0.12em] disabled:opacity-40",
+                      u.plan === "pro"
+                        ? "border-[#f87171]/40 text-neg hover:bg-neg/10"
+                        : "border-[#34d399]/40 text-pos hover:bg-pos/10",
+                    )}
+                  >
+                    {u.plan === "pro" ? "REVOKE PRO" : "GRANT PRO"}
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 export default function Admin() {
   const { user, isLoading } = useAuth();
   const { data, refetch } = trpc.admin.stats.useQuery(undefined, {
@@ -401,6 +480,8 @@ export default function Admin() {
           </div>
         ))}
       </div>
+
+      <UserManagement currentUserId={user!.id} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* feed status */}

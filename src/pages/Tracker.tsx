@@ -122,7 +122,7 @@ export default function Tracker() {
           to="/login"
           className="mt-6 inline-block rounded-sm bg-primary px-8 py-3 font-mono2 text-[11px] font-bold tracking-[0.16em] text-primary-foreground"
         >
-          SIGN IN WITH KIMI
+          SIGN IN / REGISTER
         </Link>
       </div>
     );

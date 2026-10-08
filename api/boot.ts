@@ -5,7 +5,7 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./router";
 import { createContext } from "./context";
 import { env } from "./lib/env";
-import { createOAuthCallbackHandler, createDemoProHandler } from "./kimi/auth";
+import { createOAuthCallbackHandler } from "./kimi/auth";
 import { Paths } from "@contracts/constants";
 import { handleAssistantChat } from "./assistant";
 import { startSimulator } from "./lib/sim";
@@ -16,8 +16,6 @@ const app = new Hono<{ Bindings: HttpBindings }>();
 
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
 app.get(Paths.oauthCallback, createOAuthCallbackHandler());
-// DEMO: preview the paid (PRO) experience without billing
-app.get("/api/auth/demo-pro", createDemoProHandler());
 app.post("/api/ai/chat", async (c) => handleAssistantChat(c.req.raw));
 // realtime odds-feed status (SSE)
 app.get("/api/feed/stream", (c) => feedStreamHandler(c));

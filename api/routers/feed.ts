@@ -5,7 +5,7 @@
  *  - admin: discovery, manual sync, mode switch (DEMO <-> LIVE), quota detail
  */
 import { z } from "zod";
-import { asc, desc, eq } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 import { adminQuery, createRouter, publicQuery } from "../middleware";
 import { getDb } from "../queries/connection";
 import { oddsOutrights, sportsbooks } from "@db/schema";
@@ -52,7 +52,7 @@ export const feedRouter = createRouter({
         .from(oddsOutrights)
         .orderBy(asc(oddsOutrights.sportCode), asc(oddsOutrights.providerSportKey), asc(oddsOutrights.participant));
       const filtered = input?.sportCode
-        ? rows.filter((r) => r.sportCode === input.sportCode.toUpperCase())
+        ? rows.filter((r) => r.sportCode === input!.sportCode!.toUpperCase())
         : rows;
       const books = await db.select().from(sportsbooks);
       const bookName = new Map(books.map((b) => [b.id, b.name]));

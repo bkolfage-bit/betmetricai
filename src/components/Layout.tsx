@@ -115,7 +115,7 @@ function Ticker() {
     staleTime: 15000,
   });
   const { isVisible } = useSportFilter();
-  const items = (data ?? [])
+  const items = (data?.picks ?? [])
     .filter((p) => p.version && p.version.status !== "PASS" && isVisible(p.sportCode))
     .slice(0, 10);
   if (items.length === 0) return null;

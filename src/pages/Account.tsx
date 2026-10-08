@@ -1,8 +1,70 @@
+import { useState } from "react";
 import { Link } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
+import { trpc } from "@/providers/trpc";
 import { SectionHead } from "@/components/bits";
 import { fmtTime } from "@/lib/format";
-import { CircleUser, LogOut, Shield } from "lucide-react";
+import { CircleUser, KeyRound, LogOut, Shield } from "lucide-react";
+
+function ChangePassword() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const mut = trpc.auth.changePassword.useMutation({
+    onSuccess: () => {
+      setMsg("Password updated.");
+      setErr(null);
+      setCurrent("");
+      setNext("");
+    },
+    onError: (e) => {
+      setErr(e.message);
+      setMsg(null);
+    },
+  });
+  return (
+    <div className="panel rounded-sm p-6">
+      <p className="label-caps mb-3 flex items-center gap-2">
+        <KeyRound className="h-3.5 w-3.5" /> Change password
+      </p>
+      <form
+        className="flex flex-col gap-3 sm:flex-row sm:items-end"
+        onSubmit={(e) => {
+          e.preventDefault();
+          mut.mutate({ currentPassword: current, newPassword: next });
+        }}
+      >
+        <input
+          type="password"
+          required
+          placeholder="Current password"
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+          className="min-h-[44px] flex-1 rounded-sm border border-border bg-background px-3 text-sm outline-none focus:border-primary/50"
+        />
+        <input
+          type="password"
+          required
+          minLength={8}
+          placeholder="New password (8+ chars)"
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+          className="min-h-[44px] flex-1 rounded-sm border border-border bg-background px-3 text-sm outline-none focus:border-primary/50"
+        />
+        <button
+          type="submit"
+          disabled={mut.isPending}
+          className="min-h-[44px] rounded-sm border border-primary/50 px-5 font-mono2 text-[10px] font-bold tracking-[0.14em] text-primary hover:bg-live-dim disabled:opacity-50"
+        >
+          {mut.isPending ? "SAVING…" : "UPDATE"}
+        </button>
+      </form>
+      {msg && <p className="mt-2 font-mono2 text-[10px] text-pos">{msg}</p>}
+      {err && <p className="mt-2 font-mono2 text-[10px] text-neg">{err}</p>}
+    </div>
+  );
+}
 
 export default function Account() {
   const { user, isLoading, logout } = useAuth();
@@ -17,14 +79,8 @@ export default function Account() {
             to="/login"
             className="rounded-sm bg-primary px-8 py-3 font-mono2 text-[11px] font-bold tracking-[0.16em] text-primary-foreground"
           >
-            SIGN IN WITH KIMI
+            SIGN IN / REGISTER
           </Link>
-          <a
-            href="/api/auth/demo-pro"
-            className="rounded-sm border border-[#fbbf24]/50 px-6 py-3 font-mono2 text-[11px] font-bold tracking-[0.14em] text-warn"
-          >
-            PREVIEW PRO — DEMO
-          </a>
         </div>
       </div>
     );
@@ -41,7 +97,9 @@ export default function Account() {
         <div className="flex-1">
           <p className="flex items-center gap-2 text-lg font-bold">
             {user.name ?? "Bettor"}
-            {user.role === "admin" && (
+            {user.hasPassword && <ChangePassword />}
+
+      {user.role === "admin" && (
               <span className="flex items-center gap-1 rounded-sm border border-[#fbbf24]/40 bg-warn-dim px-1.5 py-0.5 font-mono2 text-[9px] font-bold text-warn">
                 <Shield className="h-3 w-3" /> ADMIN
               </span>
@@ -59,13 +117,6 @@ export default function Account() {
           <LogOut className="h-3.5 w-3.5" /> SIGN OUT
         </button>
       </div>
-
-      {user.unionId === "demo-pro-preview" && (
-        <div className="rounded-sm border border-[#fbbf24]/40 bg-warn-dim px-4 py-3 font-mono2 text-[11px] leading-relaxed text-warn">
-          DEMO PRO PREVIEW — you are browsing the paid experience with a demo account.
-          No billing involved. Sign out to leave the demo.
-        </div>
-      )}
 
       <div className="panel rounded-sm p-6">
         <p className="label-caps mb-3">Subscription</p>

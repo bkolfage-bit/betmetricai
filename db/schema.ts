@@ -16,6 +16,8 @@ export const users = mysqlTable("users", {
   unionId: varchar("unionId", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 255 }),
   email: varchar("email", { length: 320 }),
+  /** scrypt hash for standalone email/password accounts; null for OAuth users */
+  passwordHash: varchar("passwordHash", { length: 255 }),
   avatar: text("avatar"),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   plan: mysqlEnum("plan", ["free", "pro"]).default("free").notNull(),

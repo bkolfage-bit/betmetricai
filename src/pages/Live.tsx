@@ -14,7 +14,7 @@ export default function Live() {
   const liveEvents = (events ?? []).filter(
     (e) => e.event.status === "live" && isVisible(e.sport.code),
   );
-  const livePicks = (picks ?? []).filter(
+  const livePicks = (picks?.picks ?? []).filter(
     (p) => p.event.status === "live" && isVisible(p.sportCode),
   );
 

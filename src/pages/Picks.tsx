@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { PickCard } from "@/components/PickCard";
 import { useSportFilter } from "@/providers/sport-filter";
 import { EmptyState, SectionHead } from "@/components/bits";
 import { cn } from "@/lib/utils";
 import { STATUS_META, type PickStatus } from "@/lib/format";
+import { Lock, Sparkles } from "lucide-react";
 
 const FILTERS: Array<{ key: PickStatus | "ALL"; label: string }> = [
   { key: "ALL", label: "ALL" },
@@ -24,14 +26,14 @@ export default function Picks() {
   const [filter, setFilter] = useState<PickStatus | "ALL">("ALL");
 
   const rows = useMemo(() => {
-    const all = data ?? [];
+    const all = data?.picks ?? [];
     if (filter === "ALL") return all;
     return all.filter((p) => p.version?.status === filter);
   }, [data, filter]);
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { ALL: (data ?? []).length };
-    for (const p of data ?? []) {
+    const c: Record<string, number> = { ALL: (data?.picks ?? []).length };
+    for (const p of data?.picks ?? []) {
       if (p.version) c[p.version.status] = (c[p.version.status] ?? 0) + 1;
     }
     return c;
@@ -84,6 +86,24 @@ export default function Picks() {
           <PickCard key={row.pick.id} row={row} />
         ))}
       </div>
+
+      {!isLoading && (data?.lockedCount ?? 0) > 0 && (
+        <Link
+          to="/premium"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-[#fbbf24]/40 bg-warn-dim px-5 py-4 transition-colors hover:border-[#fbbf24]/70"
+        >
+          <div className="flex items-center gap-3">
+            <Lock className="h-4 w-4 text-warn" />
+            <p className="text-xs text-muted-foreground">
+              <span className="font-bold text-foreground">{data!.lockedCount} more pick{data!.lockedCount === 1 ? "" : "s"}</span>{" "}
+              hidden on the FREE plan — including every AI Edge above 90.
+            </p>
+          </div>
+          <span className="flex items-center gap-1.5 font-mono2 text-[10px] font-bold tracking-[0.14em] text-warn">
+            <Sparkles className="h-3.5 w-3.5" /> UNLOCK WITH PRO
+          </span>
+        </Link>
+      )}
 
       <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
         * A 62% win probability is a prediction — not automatically a bet. Statuses

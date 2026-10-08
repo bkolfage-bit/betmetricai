@@ -10,7 +10,7 @@ function BestBetNow() {
   const { isVisible } = useSportFilter();
   const { data: list } = trpc.picks.list.useQuery(undefined, { refetchInterval: 15000 });
   const data =
-    (list ?? [])
+    (list?.picks ?? [])
       .filter((r) => r.version && r.version.status !== "PASS" && isVisible(r.sportCode))
       .sort((a, b) => (b.version?.edgeScore ?? 0) - (a.version?.edgeScore ?? 0))[0] ?? null;
   if (!data?.version) {
@@ -79,7 +79,7 @@ export default function Home() {
   const { isVisible } = useSportFilter();
   const { data: picks } = trpc.picks.list.useQuery(undefined, { refetchInterval: 20000 });
   const { data: perf } = trpc.performance.summary.useQuery();
-  const top = (picks ?? [])
+  const top = (picks?.picks ?? [])
     .filter((p) => p.version && p.version.status !== "PASS" && isVisible(p.sportCode))
     .slice(0, 3);
   const curve = (perf?.curve ?? []).filter((_, i) => i % 2 === 0).map((c) => c.units);

@@ -285,4 +285,38 @@ export const adminRouter = createRouter({
         .where(eq(sportsbooks.id, input.bookId));
       return { ok: true };
     }),
+
+  /** All registered accounts — for granting/revoking PRO access (testers etc.). */
+  listUsers: adminQuery.query(async () => {
+    const db = getDb();
+    const rows = await db.select().from(users).orderBy(desc(users.createdAt));
+    return rows.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      plan: u.plan,
+      authType: u.unionId.startsWith("local:") ? ("email" as const) : ("kimi" as const),
+      createdAt: u.createdAt,
+      lastSignInAt: u.lastSignInAt,
+    }));
+  }),
+
+  /** Grant or revoke PRO access. Admins cannot demote themselves. */
+  setPlan: adminQuery
+    .input(z.object({ userId: z.number(), plan: z.enum(["free", "pro"]) }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.userId === ctx.user.id && input.plan === "free") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "You cannot revoke your own PRO access.",
+        });
+      }
+      const db = getDb();
+      await db
+        .update(users)
+        .set({ plan: input.plan })
+        .where(eq(users.id, input.userId));
+      return { ok: true };
+    }),
 });

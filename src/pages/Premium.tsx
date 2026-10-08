@@ -1,12 +1,13 @@
+import { Link } from "react-router";
 import { SectionHead } from "@/components/bits";
 import { cn } from "@/lib/utils";
 import { Check, Minus, Sparkles } from "lucide-react";
 
 const FREE = [
-  "Limited AI picks (top 3)",
+  "2 AI picks per sport",
+  "AI Edge ratings up to 90",
   "Basic odds board",
   "Live scores",
-  "Limited AI explanations",
   "Basic bet tracker",
 ];
 const PRO = [
@@ -51,26 +52,26 @@ const PLANS = [
 export default function Premium() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-10">
-      {/* demo pro preview */}
+      {/* beta access notice — billing not yet connected, access is admin-granted */}
       <div className="panel flex flex-wrap items-center justify-between gap-4 rounded-sm border-[#fbbf24]/40 p-5">
         <div className="flex items-start gap-3">
           <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-warn" />
           <div>
             <p className="font-mono2 text-xs font-bold tracking-[0.16em] text-warn">
-              DEMO — TRY THE PAID EXPERIENCE
+              BETA — PRO ACCESS IS GRANTED BY INVITE
             </p>
             <p className="mt-1 max-w-lg text-xs leading-relaxed text-muted-foreground">
-              Billing is not connected yet. Preview the full PRO terminal with a demo
-              account — no card, no checkout. Sign out anytime to leave the demo.
+              Billing is not connected yet. Create a free account, then ask the
+              platform admin to activate PRO on it — it unlocks instantly.
             </p>
           </div>
         </div>
-        <a
-          href="/api/auth/demo-pro"
+        <Link
+          to="/login"
           className="min-h-[44px] rounded-sm bg-[#fbbf24] px-5 py-3 font-mono2 text-[11px] font-bold tracking-[0.14em] text-[#050810] transition-transform hover:scale-[1.02]"
         >
-          PREVIEW PRO — DEMO ACCESS
-        </a>
+          CREATE FREE ACCOUNT
+        </Link>
       </div>
 
       <div className="text-center">
@@ -120,8 +121,8 @@ export default function Premium() {
                 {p.cta}
               </button>
             ) : (
-              <a
-                href="/api/auth/demo-pro"
+              <Link
+                to="/login"
                 className={cn(
                   "mt-6 flex min-h-[44px] items-center justify-center rounded-sm font-mono2 text-[11px] font-bold tracking-[0.16em]",
                   p.highlight
@@ -129,8 +130,8 @@ export default function Premium() {
                     : "border border-border text-muted-foreground hover:text-foreground",
                 )}
               >
-                {p.cta} — DEMO
-              </a>
+                {p.cta}
+              </Link>
             )}
           </div>
         ))}
@@ -150,8 +151,8 @@ export default function Premium() {
             </thead>
             <tbody>
               {[
-                ["AI picks", "Top 3", "Unlimited"],
-                ["AI Edge Score", "Hidden", "Full 0–100 + history"],
+                ["AI picks", "2 per sport", "Unlimited"],
+                ["AI Edge Score", "Up to 90", "Full 0–100 + history"],
                 ["Player props", false, true],
                 ["+EV screen", false, true],
                 ["Line movement", false, true],

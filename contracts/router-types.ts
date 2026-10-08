@@ -7,7 +7,7 @@ import type { AppRouter } from "../api/router";
 
 export type RouterOutputs = inferRouterOutputs<AppRouter>;
 
-export type PickListRow = RouterOutputs["picks"]["list"][number];
+export type PickListRow = RouterOutputs["picks"]["list"]["picks"][number];
 export type PickDetail = RouterOutputs["picks"]["detail"];
 export type BestNow = RouterOutputs["picks"]["bestNow"];
 export type EventRow = RouterOutputs["odds"]["events"][number];

@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { useFeed } from "@/hooks/useFeed";
 import { EdgeGauge, Freshness, StatusBadge } from "@/components/bits";
 import { fmtLine, fmtOdds, fmtTime, num, pct, signedPct, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { ChevronDown, TrendingUp } from "lucide-react";
+import { ChevronDown, Lock, TrendingUp } from "lucide-react";
 import type { PickListRow } from "@contracts/router-types";
 
 type PickRow = PickListRow;
@@ -23,6 +24,18 @@ export function selectionLabel(p: PickRow): string {
 function VersionTimeline({ pickId }: { pickId: number }) {
   const { data } = trpc.picks.detail.useQuery({ pickId });
   if (!data) return <div className="py-4 font-mono2 text-[10px] text-muted-foreground">LOADING TIMELINE…</div>;
+  if ("locked" in data) {
+    return (
+      <div className="flex items-center gap-3 py-5">
+        <Lock className="h-4 w-4 text-warn" />
+        <p className="text-xs text-muted-foreground">
+          Full timeline &amp; book comparison are{" "}
+          <Link to="/premium" className="font-bold text-warn underline underline-offset-2">PRO</Link>{" "}
+          features.
+        </p>
+      </div>
+    );
+  }
   const bestBookId = data.versions[0]?.sportsbookId;
   return (
     <div className="grid gap-6 py-4 lg:grid-cols-2">
