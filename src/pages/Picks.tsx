@@ -4,6 +4,7 @@ import { trpc } from "@/providers/trpc";
 import { PickCard } from "@/components/PickCard";
 import { Seo } from "@/components/Seo";
 import { useSportFilter } from "@/providers/sport-filter";
+import { useAuth } from "@/hooks/useAuth";
 import { EmptyState, SectionHead } from "@/components/bits";
 import { cn } from "@/lib/utils";
 import { STATUS_META, type PickStatus } from "@/lib/format";
@@ -20,6 +21,8 @@ const FILTERS: Array<{ key: PickStatus | "ALL"; label: string }> = [
 
 export default function Picks() {
   const { sport } = useSportFilter();
+  const { user } = useAuth();
+  const isPro = user?.plan === "pro" || user?.role === "admin";
   const { data, isLoading } = trpc.picks.list.useQuery(
     sport ? { sport } : undefined,
     { refetchInterval: 15000 },
@@ -48,6 +51,26 @@ export default function Picks() {
         title="AI Picks"
         sub="Our AI's best positions right now, ranked by how strongly the numbers disagree with the sportsbook's price. Every pick updates as odds move — and its full history stays visible."
       />
+
+      {!isPro && (
+        <Link
+          to="/premium"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-[#fbbf24]/40 bg-warn-dim px-5 py-4 transition-colors hover:border-[#fbbf24]/70"
+        >
+          <div className="flex items-start gap-3">
+            <Lock className="mt-0.5 h-4 w-4 shrink-0 text-warn" />
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              <span className="font-bold text-foreground">You're seeing the free board — not the full one.</span>{" "}
+              What shows up here is a sample: two picks per sport, and none of the positions our AI rates
+              highest. The picks with the strongest edge — the ones we'd actually put our name on — are
+              only on the Pro board.
+            </p>
+          </div>
+          <span className="flex items-center gap-1.5 font-mono2 text-[10px] font-bold tracking-[0.14em] text-warn">
+            <Sparkles className="h-3.5 w-3.5" /> SEE EVERYTHING WITH PRO
+          </span>
+        </Link>
+      )}
 
       {/* status filter rail */}
       <div className="flex flex-wrap gap-1.5">
