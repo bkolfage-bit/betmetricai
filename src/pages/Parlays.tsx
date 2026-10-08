@@ -5,7 +5,7 @@ import { SectionHead } from "@/components/bits";
 import { Seo } from "@/components/Seo";
 import { ProGate } from "@/components/ProTeaser";
 import { useAuth } from "@/hooks/useAuth";
-import { fmtOdds, pct, signedPct } from "@/lib/format";
+import { fmtOdds, fmtTime, pct, signedPct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Layers, Sparkles } from "lucide-react";
 
@@ -127,8 +127,19 @@ export default function Parlays() {
               <div key={l.pickId} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 px-5 py-3">
                 <div className="flex items-center gap-3">
                   <span className="font-mono2 text-[10px] text-muted-foreground">LEG {i + 1}</span>
-                  <span className="font-bold">{l.label}</span>
-                  <span className="font-mono2 text-xs text-primary tabular-nums">{fmtOdds(l.odds)}</span>
+                  <div className="min-w-0">
+                    <p className="font-mono2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                      <span className="font-bold text-foreground/80">{l.sport}</span>
+                      <span className="mx-1.5 text-muted-foreground/50">/</span>
+                      {l.away} @ {l.home}
+                      <span className="mx-1.5 text-muted-foreground/50">/</span>
+                      {fmtTime(l.startTime)}
+                    </p>
+                    <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2">
+                      <span className="font-bold">{l.label}</span>
+                      <span className="font-mono2 text-xs text-primary tabular-nums">{fmtOdds(l.odds)}</span>
+                    </p>
+                  </div>
                 </div>
                 <div className="flex gap-5 font-mono2 text-[10px] text-muted-foreground">
                   <span>MODEL <b className="text-foreground">{pct(l.modelProb)}</b></span>

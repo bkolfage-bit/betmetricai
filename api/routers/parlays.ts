@@ -113,6 +113,10 @@ export const parlaysRouter = createRouter({
       type Leg = {
         pickId: number;
         label: string;
+        home: string;
+        away: string;
+        sport: string;
+        startTime: Date;
         odds: number;
         modelProb: number;
         ev: number;
@@ -132,6 +136,10 @@ export const parlaysRouter = createRouter({
               ctx.home.abbr,
               ctx.away.abbr,
             ),
+            home: ctx.home.name,
+            away: ctx.away.name,
+            sport: ctx.sport.code,
+            startTime: ctx.event.startTime,
             odds: v.odds,
             modelProb: parseFloat(v.modelProb),
             ev: parseFloat(v.ev),
@@ -190,7 +198,7 @@ export const parlaysRouter = createRouter({
         chosen
           .map(
             (l) =>
-              `${l.label} (model ${(l.modelProb * 100).toFixed(1)}%, EV ${(l.ev * 100).toFixed(1)}%)`,
+              `${l.label} in ${l.away} @ ${l.home} (model ${(l.modelProb * 100).toFixed(1)}%, EV ${(l.ev * 100).toFixed(1)}%)`,
           )
           .join("; ") +
         `. Combined model probability ${(combinedProb * 100).toFixed(1)}% against implied ${((1 / dec) * 100).toFixed(1)}%, for a combined expected value of ${(combinedEv * 100).toFixed(1)}% per unit. Legs are treated as independent; correlation between legs is not modeled. Parlays multiply variance — nothing here is a guarantee.`;
