@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
-import { DataSourceBadge, Freshness } from "@/components/bits";
+import { DataSourceBadge } from "@/components/bits";
 import { useFeedStatus } from "@/hooks/use-feed-status";
 import { SportFilter } from "@/components/SportFilter";
 import { useSportFilter } from "@/providers/sport-filter";
@@ -305,9 +305,6 @@ function MobileMenu() {
 export default function Layout() {
   const { user, isLoading } = useAuth();
   const location = useLocation();
-  const { data: fresh } = trpc.odds.freshness.useQuery(undefined, {
-    refetchInterval: 15000,
-  });
   const feed = useFeedStatus();
   const feedDegraded =
     feed.mode === "live" &&
@@ -388,20 +385,15 @@ export default function Layout() {
         </div>
       </nav>
 
-      {/* meta strip: freshness (always) + ticker (desktop only) */}
+      {/* meta strip: ticker (desktop only) */}
       <div className="border-b border-border/60 bg-background/60">
-        <div className="mx-auto flex max-w-[1500px] items-center justify-between px-3 py-1 sm:px-5">
-          <Freshness
-            at={fresh?.lastOddsAt ?? null}
-            live={location.pathname === "/live"}
-            expectedSec={fresh?.expectedPollSec ?? null}
-          />
+        <div className="mx-auto flex max-w-[1500px] items-center justify-end px-3 py-1 sm:px-5">
           <span className="flex items-center gap-3">
             <span className="sm:hidden">
               <DataSourceBadge mode={feed.mode} degraded={feedDegraded} />
             </span>
             <span className="hidden font-mono2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground sm:inline">
-              10 SPORTS · QUANT ENSEMBLES
+              10 SPORTS · AI PREDICTION MODELS
             </span>
           </span>
         </div>
