@@ -8,8 +8,9 @@ import {
   predictions,
   sports,
   sportsbooks,
+  teamRatings,
 } from "@db/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   americanToImplied,
   fmtLine,
@@ -204,6 +205,28 @@ export async function computePickVersion(
   const confidence = parseFloat(pred.confidence);
   const modelProb = marketProbability(like, market, pick.selection, line);
 
+  // Calibration gate (mirrors ensureEventPicks): if EITHER competitor lacks
+  // a hand-calibrated rating for this model version, the prediction is
+  // built on a league-average prior and any "edge" over a lopsided market
+  // is phantom — manufactured from ignorance, not information. The pick row
+  // itself may predate the creation-time gate, so enforce it at pricing
+  // time too: cap the score at PASS no matter what the numbers say.
+  const modelForGate = SPORT_MODELS[sport.code];
+  let ratingsCalibrated = true;
+  if (modelForGate) {
+    const calSides = await db
+      .selectDistinct({ teamId: teamRatings.teamId })
+      .from(teamRatings)
+      .where(
+        and(
+          inArray(teamRatings.teamId, [event.homeTeamId, event.awayTeamId]),
+          eq(teamRatings.featureVersion, modelForGate.featureVersion),
+          eq(teamRatings.isCalibrated, 1),
+        ),
+      );
+    ratingsCalibrated = calSides.length >= 2;
+  }
+
   // N-way no-vig at the best book (2-way spreads/totals, 3-way soccer ML)
   const allSelections =
     market === "moneyline"
@@ -264,7 +287,7 @@ export async function computePickVersion(
   }
 
   const weights = await getEdgeWeights(sport.code);
-  const edgeScore = aiEdgeScoreEx({
+  const rawScore = aiEdgeScoreEx({
     probEdge,
     ev: evPerUnit,
     confidence,
@@ -273,6 +296,7 @@ export async function computePickVersion(
     dataQuality: 0.9,
     weights,
   });
+  const edgeScore = ratingsCalibrated ? rawScore : Math.min(rawScore, 50);
   const thresholds = await getThresholds();
   const model = SPORT_MODELS[sport.code];
 

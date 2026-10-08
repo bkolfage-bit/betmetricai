@@ -35,11 +35,13 @@ const SCORES_INTERVAL_MS = 5 * 60 * 1000; // /scores: 1 credit per sport-key
 const PM_INTERVAL_MS = 10 * 60 * 1000; // prediction markets: free public APIs
 const V2_INTERVAL_MS = 24 * 60 * 60 * 1000; // v2 model re-train/validate daily
 const HEALTH_INTERVAL_MS = 30 * 60 * 1000; // recompute real model health
+const SWEEP_INTERVAL_MS = 15 * 60 * 1000; // re-price every open pick
 let lastOutrightsRun = 0;
 let lastScoresRun = 0;
 let lastPmRun = 0;
 let lastV2Run = 0;
 let lastHealthRun = 0;
+let lastSweepRun = 0;
 
 interface TierDef {
   maxAheadMs: number;
@@ -88,6 +90,32 @@ async function tick(): Promise<void> {
         );
       } catch (e) {
         console.error("[health] refresh failed:", e instanceof Error ? e.message : e);
+      }
+    }
+
+    // pick-pricing sweep: recompute every pick on every open event
+    // against the freshest odds + the calibration gate, so statuses can
+    // never freeze at values produced from stale prices or prior-based
+    // ratings. Material changes are versioned (history preserved);
+    // non-material recomputes write nothing.
+    if (now - lastSweepRun >= SWEEP_INTERVAL_MS) {
+      lastSweepRun = now;
+      try {
+        const { recomputeEventPicks } = await import("../engine/recompute");
+        const sweepDb = getDb();
+        const open = await sweepDb
+          .select({ id: events.id })
+          .from(events)
+          .where(inArray(events.status, ["scheduled", "live"]))
+          .limit(600);
+        let changed = 0;
+        for (const e of open) {
+          const rs = await recomputeEventPicks(e.id).catch(() => []);
+          changed += rs.filter((r) => r.changed).length;
+        }
+        if (changed > 0) console.log(`[sweep] repriced ${open.length} open events — ${changed} material pick updates`);
+      } catch (e) {
+        console.error("[sweep] failed:", e instanceof Error ? e.message : e);
       }
     }
 
