@@ -34,10 +34,12 @@ const OUTRIGHTS_INTERVAL_MS = 24 * 60 * 60 * 1000; // futures move slowly
 const SCORES_INTERVAL_MS = 5 * 60 * 1000; // /scores: 1 credit per sport-key
 const PM_INTERVAL_MS = 10 * 60 * 1000; // prediction markets: free public APIs
 const V2_INTERVAL_MS = 24 * 60 * 60 * 1000; // v2 model re-train/validate daily
+const HEALTH_INTERVAL_MS = 30 * 60 * 1000; // recompute real model health
 let lastOutrightsRun = 0;
 let lastScoresRun = 0;
 let lastPmRun = 0;
 let lastV2Run = 0;
+let lastHealthRun = 0;
 
 interface TierDef {
   maxAheadMs: number;
@@ -65,6 +67,30 @@ async function tick(): Promise<void> {
   if (running) return; // never overlap ticks
   running = true;
   try {
+    const now = Date.now();
+
+    // model-health pass: recompute every check from real data (odds
+    // snapshots, graded pick history, predictions, ratings) so the admin
+    // dashboard always reflects current reality, never stale artifacts.
+    // Runs in every feed mode — health must stay current even when the
+    // odds feed itself is suspended or in demo.
+    if (now - lastHealthRun >= HEALTH_INTERVAL_MS) {
+      lastHealthRun = now;
+      try {
+        const { refreshModelHealth } = await import("../engine/health");
+        const s = await refreshModelHealth();
+        const bad = s.filter((x) => x.status !== "HEALTHY");
+        console.log(
+          `[health] refreshed ${s.length} models — ` +
+            (bad.length
+              ? bad.map((x) => `${x.modelId}=${x.status}(${x.failing.join("|")})`).join(", ")
+              : "all HEALTHY"),
+        );
+      } catch (e) {
+        console.error("[health] refresh failed:", e instanceof Error ? e.message : e);
+      }
+    }
+
     const mode = await getFeedMode();
     if (mode !== "live") return;
 
@@ -72,7 +98,6 @@ async function tick(): Promise<void> {
     if (quota.tier === "suspended" || quota.tier === "critical") return;
 
     const db = getDb();
-    const now = Date.now();
 
     // active sport codes straight from the discovered mapping
     const mapRows = await db.select().from(oddsSportMap).where(eq(oddsSportMap.status, "active"));
