@@ -248,11 +248,6 @@ export default function About() {
         <SectionHead
           title="Every sport is different"
           sub="We don't believe one generic AI model should predict every sport. Different sports require different mathematics — our platform is built accordingly."
-          right={
-            <Link to="/sports" className="font-mono2 text-[10px] tracking-[0.16em] text-primary hover:underline">
-              MODEL REGISTRY →
-            </Link>
-          }
         />
         <div className="grid gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
           {SPORT_MODELS.map((s) => (

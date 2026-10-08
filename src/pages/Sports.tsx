@@ -40,7 +40,7 @@ function HealthBadge({ status }: { status: string }) {
   );
 }
 
-function UpgradeReport() {
+export function UpgradeReport() {
   const { data } = trpc.models.upgradeReport.useQuery();
   if (!data || data.sports.length === 0) return null;
   return (

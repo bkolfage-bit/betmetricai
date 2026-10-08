@@ -2,8 +2,11 @@
  * Models router — quantitative model registry, health, calibration,
  * backtests, edge-score weights, and the retraining validation pipeline.
  *
- * Admin actions follow §21: retraining runs validation gates and queues
- * for ADMIN REVIEW. Nothing auto-deploys to production.
+ * ADMIN-ONLY: model internals (ensemble weights, feature versions,
+ * calibration, backtests, validation scores) are proprietary and are not
+ * exposed to end users. The public SportFilter uses the `sports` router
+ * instead. Admin actions follow §21: retraining runs validation gates
+ * and queues for ADMIN REVIEW. Nothing auto-deploys to production.
  */
 import { z } from "zod";
 import { createRouter, publicQuery, adminQuery } from "../middleware";
@@ -39,7 +42,7 @@ function parseJson<T>(raw: string | null, fallback: T): T {
 
 export const modelsRouter = createRouter({
   /** Registry of all sport models with their latest health status. */
-  list: publicQuery.query(async () => {
+  list: adminQuery.query(async () => {
     const db = getDb();
     const rows = await db.select().from(models);
     const healthRows = await db
@@ -77,7 +80,7 @@ export const modelsRouter = createRouter({
   }),
 
   /** Full model detail: components, metrics, calibration, backtests, health checks. */
-  detail: publicQuery
+  detail: adminQuery
     .input(z.object({ modelId: z.string() }))
     .query(async ({ input }) => {
       const db = getDb();
@@ -151,7 +154,7 @@ export const modelsRouter = createRouter({
     }),
 
   /** Edge-score weights per sport (public so pick cards can explain scores). */
-  edgeWeights: publicQuery
+  edgeWeights: adminQuery
     .input(z.object({ sportCode: z.string().optional() }).optional())
     .query(async ({ input }) => {
       if (input?.sportCode) {
@@ -324,7 +327,7 @@ export const modelsRouter = createRouter({
   /** Sport metadata for filter rails (code, name, status, event counts). */
   /** v2 upgrade transparency: walk-forward validation per sport, data
    *  corpus sizes, and which models are deployed vs. held back. */
-  upgradeReport: publicQuery.query(async () => {
+  upgradeReport: adminQuery.query(async () => {
     const db = getDb();
     const { gameResults, modelValidation } = await import("@db/schema");
     const corpus = await db

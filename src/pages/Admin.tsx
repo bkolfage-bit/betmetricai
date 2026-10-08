@@ -6,6 +6,7 @@ import { SectionHead } from "@/components/bits";
 import { timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Shield } from "lucide-react";
+import { UpgradeReport } from "@/pages/Sports";
 
 type EdgeWeightDraft = {
   probEdge: number;
@@ -573,6 +574,8 @@ export default function Admin() {
           </div>
         </section>
       </div>
+
+      <UpgradeReport />
 
       <ModelRegistry />
 

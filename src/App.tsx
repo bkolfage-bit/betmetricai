@@ -20,6 +20,7 @@ import Admin from "./pages/Admin";
 import Login from "./pages/Login";
 import About from "./pages/About";
 import NotFound from "./pages/NotFound";
+import AdminGate from "./components/AdminGate";
 
 export default function App() {
   return (
@@ -34,8 +35,8 @@ export default function App() {
         <Route path="/props" element={<Props />} />
         <Route path="/parlays" element={<Parlays />} />
         <Route path="/line-movement" element={<LineMovement />} />
-        <Route path="/sports" element={<Sports />} />
-        <Route path="/sports/:modelId" element={<ModelDetail />} />
+        <Route path="/sports" element={<AdminGate><Sports /></AdminGate>} />
+        <Route path="/sports/:modelId" element={<AdminGate><ModelDetail /></AdminGate>} />
         <Route path="/assistant" element={<Assistant />} />
         <Route path="/tracker" element={<Tracker />} />
         <Route path="/performance" element={<Performance />} />

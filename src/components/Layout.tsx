@@ -39,16 +39,19 @@ const NAV_BASE = [
   { to: "/parlays", label: "PARLAYS" },
   { to: "/line-movement", label: "LINE MOVEMENT" },
   { to: "/markets", label: "PRED MKTS" },
-  { to: "/sports", label: "SPORTS" },
   { to: "/assistant", label: "AI ASSISTANT" },
   { to: "/tracker", label: "BET TRACKER" },
   { to: "/performance", label: "PERFORMANCE" },
 ];
 
+/** Model internals (/sports) are admin-only — see AdminGate. */
+const NAV_ADMIN = [{ to: "/sports", label: "SPORTS" }];
+
 /** Top-nav items; the /premium entry reads as PLAN once the user is PRO. */
-function navFor(plan?: string) {
+function navFor(plan?: string, role?: string) {
   return [
     ...NAV_BASE,
+    ...(role === "admin" ? NAV_ADMIN : []),
     { to: "/premium", label: plan === "pro" ? "PLAN" : "PREMIUM" },
   ];
 }
@@ -228,7 +231,10 @@ function MobileMenu() {
           {/* feature sections */}
           {MOBILE_MENU_SECTIONS.map((sec) => {
             const items = [
-              ...sec.items,
+              // model internals are admin-only
+              ...sec.items.filter(
+                (i) => i.to !== "/sports" || user?.role === "admin",
+              ),
               ...(sec.title === "ACCOUNT"
                 ? [
                     {
@@ -315,7 +321,7 @@ export default function Layout() {
         <div className="mx-auto flex h-14 max-w-[1500px] items-center gap-2 px-3 sm:gap-4 sm:px-5">
           <Logo />
           <nav className="hidden h-14 flex-1 items-stretch gap-0.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] lg:flex [&::-webkit-scrollbar]:hidden">
-            {navFor(user?.plan).map((n) => (
+            {navFor(user?.plan, user?.role).map((n) => (
               <NavLink
                 key={n.to}
                 to={n.to}
@@ -363,7 +369,7 @@ export default function Layout() {
       {/* mobile/tablet: full section nav — swipeable strip mirroring the desktop top nav */}
       <nav className="border-b border-border/60 bg-card/40 lg:hidden">
         <div className="mx-auto flex max-w-[1500px] items-stretch gap-0.5 overflow-x-auto px-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {navFor(user?.plan).map((n) => (
+          {navFor(user?.plan, user?.role).map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
