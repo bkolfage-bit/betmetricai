@@ -7,6 +7,7 @@
  */
 import { ingestRange, INGEST_SPORTS, SOCCER_LEAGUES } from "./ingest";
 import { runValidationAndDeploy } from "./deploy";
+import { ingestTennis, ingestUfc, validateAndDeployTennis, validateAndDeployUfc } from "./individual";
 
 export interface V2RefreshResult {
   ingested: number;
@@ -26,10 +27,18 @@ export async function refreshV2(): Promise<V2RefreshResult> {
     const r = await ingestRange(lg, start, end, 12).catch(() => null);
     if (r) ingested += r.inserted;
   }
+  // individual sports: same daily upkeep, same objective deployment gate
+  for (const r of await ingestTennis(start, end).catch(() => [])) ingested += r.inserted;
+  ingested += (await ingestUfc(start, end).catch(() => ({ inserted: 0 }))).inserted;
   const report = await runValidationAndDeploy();
-  return {
-    ingested,
-    deployedSports: report.filter((r) => r.v2Wins && r.deployed > 0).map((r) => r.sportCode),
-    heldBack: report.filter((r) => !r.v2Wins).map((r) => r.sportCode),
-  };
+  const tennis = await validateAndDeployTennis().catch(() => null);
+  const ufc = await validateAndDeployUfc().catch(() => null);
+  const deployedSports = report.filter((r) => r.v2Wins && r.deployed > 0).map((r) => r.sportCode);
+  const heldBack = report.filter((r) => !r.v2Wins).map((r) => r.sportCode);
+  for (const ind of [tennis, ufc]) {
+    if (!ind) continue;
+    if (ind.validated && ind.deployed > 0) deployedSports.push(ind.sportCode);
+    else if (!ind.validated) heldBack.push(ind.sportCode);
+  }
+  return { ingested, deployedSports, heldBack };
 }

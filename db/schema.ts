@@ -617,6 +617,7 @@ export const gameResults = mysqlTable("game_results", {
   awayScore: int("awayScore").notNull(),
   neutral: boolean("neutral").default(false).notNull(),
   completed: boolean("completed").default(true).notNull(),
+  surface: varchar("surface", { length: 16 }), // tennis only: hard | clay | grass
 });
 
 /** Walk-forward validation record per sport/model — objective proof that a
