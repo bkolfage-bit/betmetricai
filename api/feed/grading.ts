@@ -30,8 +30,55 @@ import {
   teams,
 } from "../../db/schema";
 import { americanPayout, americanToImplied, fmtLine } from "../lib/edge";
+import { noVigN } from "../engine/probability";
 
 const EPS = 1e-9;
+
+/**
+ * No-vig fair probability of a selection at one book, from the latest
+ * snapshots of EVERY side of the market at or before `before` (or after
+ * `after` for live windows). Returns null when any side is missing — a
+ * fair probability is never estimated from half a market.
+ */
+async function fairProbAt(
+  eventId: number,
+  market: "moneyline" | "spread" | "total",
+  selection: string,
+  sportsbookId: number,
+  opts: { before?: Date; after?: Date },
+  threeWay: boolean,
+): Promise<number | null> {
+  const db = getDb();
+  const selections =
+    market === "moneyline"
+      ? threeWay
+        ? ["home", "draw", "away"]
+        : ["home", "away"]
+      : market === "total"
+        ? ["over", "under"]
+        : ["home", "away"];
+  const odds: number[] = [];
+  for (const sel of selections) {
+    const where = and(
+      eq(oddsSnapshots.eventId, eventId),
+      eq(oddsSnapshots.market, market),
+      eq(oddsSnapshots.selection, sel),
+      eq(oddsSnapshots.sportsbookId, sportsbookId),
+      opts.before ? lte(oddsSnapshots.capturedAt, opts.before) : undefined,
+      opts.after ? gt(oddsSnapshots.capturedAt, opts.after) : undefined,
+    );
+    const [snap] = await db
+      .select({ odds: oddsSnapshots.odds })
+      .from(oddsSnapshots)
+      .where(where)
+      .orderBy(desc(oddsSnapshots.capturedAt), desc(oddsSnapshots.id))
+      .limit(1);
+    if (!snap) return null;
+    odds.push(snap.odds);
+  }
+  const idx = selections.indexOf(selection);
+  return idx >= 0 ? noVigN(odds)[idx] : null;
+}
 
 type GradeResult = "won" | "lost" | "push";
 
@@ -226,6 +273,33 @@ export async function gradeEventPicks(eventId: number): Promise<number> {
       ? (americanToImplied(closing.odds) - americanToImplied(v1.odds)) * 100
       : 0;
 
+    // No-vig CLV (the honest version): compare the FAIR probability of the
+    // selection at publication vs at the close, both de-vigged against the
+    // full market at the same book. The vig contaminates the raw measure —
+    // a price can look like it beat the close while the fair value moved
+    // against it. Null when either side can't be de-vigged (never estimated).
+    const pregame = v1.createdAt.getTime() <= event.startTime.getTime();
+    const fairTaken = await fairProbAt(
+      eventId,
+      pick.market,
+      pick.selection,
+      v1.sportsbookId,
+      { before: v1.createdAt },
+      threeWay,
+    );
+    const fairClose = await fairProbAt(
+      eventId,
+      pick.market,
+      pick.selection,
+      v1.sportsbookId,
+      pregame ? { before: event.startTime } : { after: v1.createdAt },
+      threeWay,
+    );
+    const clvNoVig =
+      fairTaken !== null && fairClose !== null
+        ? (fairClose - fairTaken) * 100
+        : null;
+
     const sideAbbr = pick.selection === "home" ? home.abbr : away.abbr;
     const selectionLabel =
       pick.market === "moneyline"
@@ -245,6 +319,8 @@ export async function gradeEventPicks(eventId: number): Promise<number> {
       result,
       units: units.toFixed(2),
       clv: clv.toFixed(3),
+      clvNoVig: clvNoVig === null ? null : clvNoVig.toFixed(3),
+      closeFairProb: fairClose === null ? null : fairClose.toFixed(4),
       placedAt: v1.createdAt, // original publication time — never backdated
       pickId: pick.id,
     });

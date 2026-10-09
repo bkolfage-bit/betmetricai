@@ -10,7 +10,7 @@
  *  - quota tiers throttle and then suspend paid calls automatically
  *  - failures are recorded — never papered over with fabricated odds
  */
-import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, lte, or, sql } from "drizzle-orm";
 import { getDb } from "../queries/connection";
 import {
   adminConfig,
@@ -35,7 +35,7 @@ import type { SportModel } from "../models/interface";
 import { recomputeEventPicks } from "../engine/recompute";
 import { gradeEventPicks } from "./grading";
 import { marketProbability } from "../engine/markets";
-import { americanToDecimal, americanToImplied, noVigN } from "../engine/probability";
+import { americanToDecimal, americanToImplied, noVigN, normCdf, poissonScoreMatrix } from "../engine/probability";
 import { getOddsProvider, hasOddsProvider } from "../providers";
 import type { ProviderEventOdds, ProviderSport, QuotaInfo } from "../providers/types";
 import { normalizeEventOdds } from "./normalize";
@@ -438,7 +438,86 @@ async function ensureEvent(ev: ProviderEventOdds, sportId: number): Promise<numb
  * (new teams carry league-average defaults until calibrated) — the output is
  * the model's own probability, never a manufactured price.
  */
+/**
+ * Rest-day adjustment for team sports. A team's last completed game sets its
+ * rest; the rest DIFFERENTIAL shifts the projected margin toward the more
+ * rested side. Magnitude: 3% of the sport's margin SD per day of rest
+ * differential (≈0.4 pts/day NFL, ≈0.36 NBA) — deliberately conservative
+ * against published back-to-back effects (0.5–1 pt), and capped at a 3-day
+ * differential. Individual sports (tennis/UFC/golf) are excluded: fighter/
+ * player "rest" is camp-based and not comparable.
+ */
+const REST_TEAM_SPORTS = new Set(["NFL", "NCAAF", "NBA", "NCAAB", "MLB", "NHL", "SOCCER"]);
+const REST_MAX_DIFF = 3;
+const REST_COEF = 0.03;
+
+async function lastFinalStart(teamId: number, sportId: number, before: Date): Promise<Date | null> {
+  const db = getDb();
+  const [row] = await db
+    .select({ startTime: events.startTime })
+    .from(events)
+    .where(
+      and(
+        eq(events.sportId, sportId),
+        eq(events.status, "final"),
+        lt(events.startTime, before),
+        or(eq(events.homeTeamId, teamId), eq(events.awayTeamId, teamId)),
+      ),
+    )
+    .orderBy(desc(events.startTime))
+    .limit(1);
+  return row?.startTime ?? null;
+}
+
+function applyRestAdjustment(
+  pred: {
+    projHomeScore: number; projAwayScore: number; projSpread: number; projTotal: number;
+    homeWinProb: number; dist: { kind: string; marginMean?: number; marginSd?: number; lambdaHome?: number; lambdaAway?: number };
+  },
+  marginSd: number,
+  restDiff: number,
+): void {
+  const delta = REST_COEF * marginSd * restDiff;
+  pred.projSpread += delta;
+  pred.projHomeScore += delta / 2;
+  pred.projAwayScore -= delta / 2;
+  if (pred.dist.kind === "poisson") {
+    const lh = pred.dist.lambdaHome ?? 1;
+    const la = pred.dist.lambdaAway ?? 1;
+    // shift win probability by the same amount the score matrix moves
+    const winFrom = (a: number, b: number) =>
+      poissonScoreMatrix(a, b, (h, w) => (h > w ? 1 : h === w ? 0.5 : 0));
+    const shift = winFrom(lh + delta / 2, Math.max(0.1, la - delta / 2)) - winFrom(lh, la);
+    pred.dist.lambdaHome = lh + delta / 2;
+    pred.dist.lambdaAway = Math.max(0.1, la - delta / 2);
+    pred.homeWinProb = Math.min(0.999, Math.max(0.001, pred.homeWinProb + shift));
+  } else {
+    const sd = pred.dist.marginSd ?? marginSd;
+    const mean = pred.dist.marginMean ?? pred.projSpread - delta;
+    const shift = normCdf((mean + delta) / sd) - normCdf(mean / sd);
+    pred.dist.marginMean = mean + delta;
+    pred.homeWinProb = Math.min(0.999, Math.max(0.001, pred.homeWinProb + shift));
+  }
+}
+
+/** Rest differential for an event (positive = home more rested), or null. */
+async function restDifferential(ev: { sportId: number; homeTeamId: number; awayTeamId: number; startTime: Date }): Promise<number | null> {
+  const [h, a] = await Promise.all([
+    lastFinalStart(ev.homeTeamId, ev.sportId, ev.startTime),
+    lastFinalStart(ev.awayTeamId, ev.sportId, ev.startTime),
+  ]);
+  if (!h || !a) return null; // no schedule history for one side — no claim
+  const DAY = 86_400_000;
+  // full rest days between games (back-to-back = 0)
+  const restH = Math.max(0, Math.floor((ev.startTime.getTime() - h.getTime()) / DAY) - 1);
+  const restA = Math.max(0, Math.floor((ev.startTime.getTime() - a.getTime()) / DAY) - 1);
+  const diff = restH - restA;
+  if (diff === 0) return null;
+  return Math.max(-REST_MAX_DIFF, Math.min(REST_MAX_DIFF, diff));
+}
+
 export async function ensurePrediction(eventId: number, sportCode: string): Promise<boolean> {
+
   const db = getDb();
   // an existing PREGAME row satisfies the guard; live rows are additive
   const [existing] = await db.select({ id: predictions.id }).from(predictions).where(and(eq(predictions.eventId, eventId), eq(predictions.isLive, false))).limit(1);
@@ -455,6 +534,14 @@ export async function ensurePrediction(eventId: number, sportCode: string): Prom
       weather: ev.weather ?? null,
       injuries: ev.injuries ?? null,
     });
+    // rest-day adjustment (team sports only): shifts margin/win prob toward
+    // the more rested side using the sport's own distribution
+    if (REST_TEAM_SPORTS.has(sportCode)) {
+      const restDiff = await restDifferential(ev).catch(() => null);
+      if (restDiff !== null) {
+        applyRestAdjustment(pred, model.live.marginSd, restDiff);
+      }
+    }
     // never persist a degenerate model output — non-finite projections, or
     // an exact 0%/100% win probability (no honest pregame model is certain)
     const finite = [pred.projHomeScore, pred.projAwayScore, pred.projSpread, pred.projTotal, pred.homeWinProb].every(Number.isFinite);

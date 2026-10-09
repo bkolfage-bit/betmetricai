@@ -24,12 +24,24 @@ import { getThresholds } from "../lib/config";
 import { marketProbability, type StandardPredictionLike } from "./markets";
 import { aiEdgeScoreEx, getEdgeWeights } from "./edge-score";
 import { SPORT_MODELS } from "../models";
+import {
+  consensusFairProb,
+  getAnchorConfig,
+  quarterKelly,
+  shrinkTowardMarket,
+} from "./market-anchor";
+import { getCalibrationFit, applyCalibrationFit } from "./calibration-fit";
+import { sportGuardrail } from "./guardrails";
 
 export interface ComputedVersion {
   line: number | null;
   odds: number;
   sportsbookId: number;
   modelProb: number;
+  /** working probability after calibration + market anchoring */
+  anchoredProb: number;
+  /** quarter-Kelly stake guidance (fraction of bankroll) */
+  kelly: number;
   impliedProb: number; // raw implied (with vig)
   noVigProb: number; // vig-free market probability
   probEdge: number;
@@ -257,8 +269,28 @@ export async function computePickVersion(
       ? noVigN(oddsAtBook)[ourIdx]
       : rawImplied;
 
-  const probEdge = modelProb - noVigProb;
-  const evPerUnit = expectedValue(modelProb, best.odds);
+  // 1. calibration: correct the raw model probability, but only with a
+  //    holdout-validated fit (n ≥ 100 graded picks) — otherwise the raw
+  //    probability is used untouched
+  const calibFit = await getCalibrationFit(sport.code);
+  const calibratedProb = calibFit ? applyCalibrationFit(calibFit, modelProb) : modelProb;
+
+  // 2. market anchor: shrink the (calibrated) model probability toward the
+  //    sharpness-weighted no-vig consensus. A model disagreeing with the
+  //    whole market needs stronger evidence than one agreeing with it.
+  const anchorCfg = await getAnchorConfig();
+  const consensus = await consensusFairProb(
+    pick.eventId,
+    market,
+    pick.selection,
+    !!like.drawProb,
+  );
+  const anchoredProb = shrinkTowardMarket(calibratedProb, consensus, market, anchorCfg);
+
+  // edge/EV are computed from the WORKING probability, not the raw model
+  const probEdge = anchoredProb - noVigProb;
+  const evPerUnit = expectedValue(anchoredProb, best.odds);
+  const kelly = quarterKelly(anchoredProb, best.odds);
 
   // line stability from recent snapshots at the best book
   const dbRows = await db
@@ -300,18 +332,38 @@ export async function computePickVersion(
   const thresholds = await getThresholds();
   const model = SPORT_MODELS[sport.code];
 
+  // EV floor: the global minimum EV plus any sport guardrail boost. The
+  // guardrail reads the sport's realized CLV — when our prices keep losing
+  // to the close in a sport, the floor rises automatically until the model
+  // proves itself against the market again. Picks below the floor are
+  // published as PASS (never hidden, never deleted).
+  const guard = await sportGuardrail(sport.code);
+  const minEv = thresholds.minEv + guard.minEvBoost;
+  let status = statusForScore(edgeScore, thresholds);
+  if (evPerUnit < minEv && status !== "PASS") status = "PASS";
+
+  // moneyline "value cutoff" is priced off the working probability too
+  const betUpToValue =
+    market === "moneyline"
+      ? anchoredProb <= 0.01 || anchoredProb >= 0.99
+        ? null
+        : probToAmerican(anchoredProb)
+      : betUpTo(like, market, pick.selection, best.odds);
+
   return {
     line,
     odds: best.odds,
     sportsbookId: best.sportsbookId,
     modelProb,
+    anchoredProb,
+    kelly,
     impliedProb: rawImplied,
     noVigProb,
     probEdge,
     ev: evPerUnit,
     edgeScore,
-    status: statusForScore(edgeScore, thresholds),
-    betUpTo: betUpTo(like, market, pick.selection, best.odds),
+    status,
+    betUpTo: betUpToValue,
     confidence,
     modelAgreement: agreement,
     modelVersion: pred.modelVersion,
@@ -396,6 +448,8 @@ export async function applyPickVersion(
     odds: computed.odds,
     sportsbookId: computed.sportsbookId,
     modelProb: String(computed.modelProb.toFixed(4)),
+    anchoredProb: String(computed.anchoredProb.toFixed(4)),
+    kelly: String(computed.kelly.toFixed(4)),
     impliedProb: String(computed.impliedProb.toFixed(4)),
     noVigProb: String(computed.noVigProb.toFixed(4)),
     probEdge: String(computed.probEdge.toFixed(4)),

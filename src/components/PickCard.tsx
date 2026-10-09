@@ -189,12 +189,17 @@ export function PickCard({ row, defaultOpen = false }: { row: PickRow; defaultOp
             <div className="hidden text-right sm:block">
               <p className="label-caps" style={{ fontSize: 8 }}>Our AI vs the book</p>
               <p className="font-mono2 text-xs tabular-nums">
-                <b>{pct(v.modelProb)}</b>
+                <b>{pct(v.anchoredProb ?? v.modelProb)}</b>
                 <span className="text-muted-foreground"> / {pct(v.impliedProb)}</span>
               </p>
               <p className={cn("font-mono2 text-[10px] tabular-nums", evNum >= 0 ? "text-pos" : "text-neg")}>
                 EV {signedPct(v.ev)} · edge {signedPct(v.probEdge)}
               </p>
+              {num(v.kelly) > 0 && (v.status === "STRONG_BET" || v.status === "BET") && (
+                <p className="font-mono2 text-[10px] tabular-nums text-primary">
+                  Suggested stake {(num(v.kelly) * 100).toFixed(1)}% of bankroll
+                </p>
+              )}
               {(v.modelAgreement || v.modelVersion) && (
                 <p className="font-mono2 text-[9px] tracking-[0.08em] text-muted-foreground">
                   {v.modelAgreement && <>MODELS AGREE <b className="text-foreground">{v.modelAgreement}</b> · </>}

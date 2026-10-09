@@ -17,6 +17,22 @@ function summarize(rows: Array<typeof pickHistory.$inferSelect>) {
   const clvs = rows.map((r) => parseFloat(r.clv));
   const avgClv = clvs.length ? clvs.reduce((s, x) => s + x, 0) / clvs.length : 0;
   const posClv = clvs.length ? clvs.filter((x) => x > 0).length / clvs.length : 0;
+  // no-vig CLV over the rows where it could be computed honestly
+  const nv = rows.filter((r) => r.clvNoVig !== null).map((r) => parseFloat(r.clvNoVig!));
+  const avgClvNoVig = nv.length ? nv.reduce((s, x) => s + x, 0) / nv.length : null;
+  const posNv = nv.length ? nv.filter((x) => x > 0).length / nv.length : null;
+  // model-vs-market Brier: our published probability vs the no-vig closing
+  // fair probability, scored against what actually happened. Lower is
+  // better; beating the market's number is the point of the exercise.
+  const scored = rows.filter(
+    (r) => r.modelProb !== null && r.closeFairProb !== null && r.result !== "push",
+  );
+  const brier = (get: (r: (typeof scored)[number]) => number) =>
+    scored.length
+      ? scored.reduce((s, r) => s + (get(r) - (r.result === "won" ? 1 : 0)) ** 2, 0) / scored.length
+      : null;
+  const modelBrier = brier((r) => parseFloat(r.modelProb!));
+  const marketBrier = brier((r) => parseFloat(r.closeFairProb!));
   return {
     total: rows.length,
     wins,
@@ -27,6 +43,12 @@ function summarize(rows: Array<typeof pickHistory.$inferSelect>) {
     units,
     avgClv,
     posClvPct: posClv,
+    avgClvNoVig,
+    posClvNoVigPct: posNv,
+    noVigSample: nv.length,
+    modelBrier,
+    marketBrier,
+    brierSample: scored.length,
   };
 }
 

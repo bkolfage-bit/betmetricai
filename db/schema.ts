@@ -276,6 +276,10 @@ export const aiPickVersions = mysqlTable("ai_pick_versions", {
     .notNull()
     .references(() => sportsbooks.id),
   modelProb: decimal("modelProb", { precision: 5, scale: 4 }).notNull(),
+  /** working probability: modelProb after calibration + market anchoring */
+  anchoredProb: decimal("anchoredProb", { precision: 5, scale: 4 }),
+  /** quarter-Kelly stake guidance (fraction of bankroll) from anchoredProb */
+  kelly: decimal("kelly", { precision: 5, scale: 4 }),
   impliedProb: decimal("impliedProb", { precision: 5, scale: 4 }).notNull(),
   noVigProb: decimal("noVigProb", { precision: 5, scale: 4 }),
   probEdge: decimal("probEdge", { precision: 5, scale: 4 }).notNull(),
@@ -331,7 +335,11 @@ export const pickHistory = mysqlTable("pick_history", {
   modelProb: decimal("modelProb", { precision: 5, scale: 4 }), // for calibration
   result: mysqlEnum("result", ["won", "lost", "push"]).notNull(),
   units: decimal("units", { precision: 6, scale: 2 }).notNull(),
-  clv: decimal("clv", { precision: 6, scale: 3 }).notNull(), // % closing line value
+  clv: decimal("clv", { precision: 6, scale: 3 }).notNull(), // % closing line value (raw implied)
+  /** % CLV measured against the no-vig closing price (null = not computable) */
+  clvNoVig: decimal("clvNoVig", { precision: 6, scale: 3 }),
+  /** no-vig fair probability of the selection at the close — the market's answer key */
+  closeFairProb: decimal("closeFairProb", { precision: 5, scale: 4 }),
   placedAt: timestamp("placedAt").notNull(),
   // Grading idempotency key (plain column, no FK: graded history must
   // survive any later pick cleanup — history is never altered).

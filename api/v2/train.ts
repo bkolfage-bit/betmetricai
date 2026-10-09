@@ -44,14 +44,16 @@ function sd(xs: number[]): number {
 }
 
 /** Ordinary least squares via normal equations with tiny ridge for stability. */
-function ols(X: number[][], y: number[], ridge = 1e-3): number[] {
+/** Weighted ridge least squares: row i is scaled by sqrt(w[i]). */
+function ols(X: number[][], y: number[], ridge = 1e-3, w?: number[]): number[] {
   const p = X[0].length;
   const XtX: number[][] = Array.from({ length: p }, () => new Array(p).fill(0));
   const Xty: number[] = new Array(p).fill(0);
   for (let i = 0; i < X.length; i++) {
+    const wi = w ? Math.sqrt(Math.max(0, w[i])) : 1;
     for (let a = 0; a < p; a++) {
-      Xty[a] += X[i][a] * y[i];
-      for (let b = 0; b < p; b++) XtX[a][b] += X[i][a] * X[i][b];
+      Xty[a] += X[i][a] * wi * y[i] * wi;
+      for (let b = 0; b < p; b++) XtX[a][b] += X[i][a] * wi * X[i][b] * wi;
     }
   }
   for (let a = 0; a < p; a++) XtX[a][a] += ridge;
@@ -118,6 +120,16 @@ export const SPORT_CONFIGS: Record<string, SportConfig> = {
 function recencyWeight(daysAgo: number, halfLife: number): number {
   return Math.pow(0.5, daysAgo / halfLife);
 }
+
+/**
+ * Half-life for the regression FIT itself. Rolling team stats decay on the
+ * sport's short half-life (form moves fast), but coefficient fits need more
+ * data than a few weeks — the fit window decays on a one-year half-life so
+ * last season still informs the model at ~50% weight while ancient games
+ * fade out. (An unweighted fit treats a 3-year-old game as equal evidence
+ * to yesterday's; a fit on only recent games is pure noise.)
+ */
+const FIT_HALF_LIFE_DAYS = 365;
 
 /* --------------------------- trained model --------------------------- */
 
@@ -229,6 +241,7 @@ export function trainModel(cfg: SportConfig, games: TrainGame[], beforeDate?: st
 
   // pass 1: collect rows + measure home advantage
   const X: number[][] = []; const yM: number[] = []; const yT: number[] = [];
+  const dates: number[] = [];
   const homeMargins: number[] = [];
   for (const g of trainSet) {
     const h = model.teams.get(g.home) ?? newTeam(g.home);
@@ -238,6 +251,7 @@ export function trainModel(cfg: SportConfig, games: TrainGame[], beforeDate?: st
     X.push([1, f.eloDiff, f.offDiff, f.defDiff, f.homeAdv, f.restDiff]);
     yM.push(g.homeScore - g.awayScore);
     yT.push(g.homeScore + g.awayScore);
+    dates.push(gameMs);
     if (!g.neutral) homeMargins.push(g.homeScore - g.awayScore);
     updateTeam(model, g);
   }
@@ -245,9 +259,13 @@ export function trainModel(cfg: SportConfig, games: TrainGame[], beforeDate?: st
   if (homeMargins.length >= 10) model.homeAdvantage = mean(homeMargins);
 
   if (X.length >= 30) {
-    model.marginCoef = ols(X, yM, 1);
+    // time-weighted fit: recent games carry more evidence about the current
+    // relationship between ratings and outcomes
+    const tMax = Math.max(...dates);
+    const w = dates.map((d) => recencyWeight((tMax - d) / DAY, FIT_HALF_LIFE_DAYS));
+    model.marginCoef = ols(X, yM, 1, w);
     const XT = X.map((r) => [1, r[2], r[3] * 0.5, r[3] * 0.5]); // simpler total model
-    model.totalCoef = ols(XT, yT, 1);
+    model.totalCoef = ols(XT, yT, 1, w);
   }
   return model;
 }

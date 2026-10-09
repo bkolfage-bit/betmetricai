@@ -204,6 +204,17 @@ async function tick(): Promise<void> {
       } catch (e) {
         console.error("[v2] refresh failed:", e instanceof Error ? e.message : e);
       }
+      // calibration maintenance (daily, same cadence): re-fit each sport's
+      // gated calibration layer from graded history. Fits only go live when
+      // they beat raw probabilities on a chronological holdout.
+      try {
+        const { refreshAllCalibrationFits } = await import("../engine/calibration-fit");
+        const report = await refreshAllCalibrationFits();
+        const adopted = Object.entries(report).filter(([, v]) => !v.startsWith("no fit"));
+        console.log(`[calibration] fits refreshed: ${adopted.length ? adopted.map(([s, v]) => `${s} ${v}`).join("; ") : "none adopted (gates)"}`);
+      } catch (e) {
+        console.error("[calibration] fit refresh failed:", e instanceof Error ? e.message : e);
+      }
     }
 
     // championship / futures exception: outrights sync daily, regardless of

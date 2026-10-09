@@ -35,8 +35,8 @@ export default function Performance() {
           ["WIN RATE", pct(o.winRate)],
           ["ROI", signedPct(o.roi)],
           ["UNITS", `${o.units >= 0 ? "+" : ""}${o.units.toFixed(1)}u`],
-          ["AVG CLV", `${o.avgClv >= 0 ? "+" : ""}${o.avgClv.toFixed(2)}%`],
-          ["+CLV RATE", pct(o.posClvPct, 0)],
+          ["AVG CLV (NO-VIG)", o.avgClvNoVig !== null ? `${o.avgClvNoVig >= 0 ? "+" : ""}${o.avgClvNoVig.toFixed(2)}%` : "—"],
+          ["+CLV RATE", o.posClvNoVigPct !== null ? pct(o.posClvNoVigPct, 0) : pct(o.posClvPct, 0)],
           ["MAX DRAWDOWN", `${o.maxDrawdown.toFixed(1)}u`],
         ].map(([k, val], i) => (
           <div key={k} className="bg-card px-4 py-3.5">
@@ -49,6 +49,31 @@ export default function Performance() {
           </div>
         ))}
       </div>
+
+      {/* model vs market — the calibration scoreboard */}
+      {o.modelBrier !== null && o.marketBrier !== null && (
+        <section className="panel rounded-sm p-5">
+          <p className="label-caps mb-1">Our AI vs the market — Brier score</p>
+          <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
+            Every graded pick is scored on how accurate its probability was (Brier score — lower is
+            better, 0 is perfect, 0.25 is a coin flip). We publish our number next to the score the
+            market's closing price achieved on the same picks. When our number is lower, the model
+            is genuinely better informed than the market on the picks we publish.
+          </p>
+          <div className="grid grid-cols-3 gap-px overflow-hidden rounded-sm border border-border bg-border font-mono2">
+            {[
+              ["OUR AI", o.modelBrier.toFixed(4), o.modelBrier <= o.marketBrier ? "text-pos" : "text-neg"],
+              ["THE MARKET (CLOSING PRICE)", o.marketBrier.toFixed(4), "text-muted-foreground"],
+              ["PICKS SCORED", `${o.brierSample}`, "text-foreground"],
+            ].map(([k, val, cls]) => (
+              <div key={k as string} className="bg-card px-4 py-3.5">
+                <p className="label-caps" style={{ fontSize: 8 }}>{k}</p>
+                <p className={cn("mt-1 text-base font-bold tabular-nums", cls as string)}>{val}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* units curve */}
       <section className="panel rounded-sm p-5">
@@ -64,7 +89,7 @@ export default function Performance() {
         <table className="w-full min-w-[720px] border-collapse font-mono2 text-xs">
           <thead>
             <tr className="border-b border-border text-left">
-              {["SPORT", "PICKS", "WIN%", "ROI", "UNITS", "AVG CLV", "+CLV RATE"].map((h) => (
+              {["SPORT", "PICKS", "WIN%", "ROI", "UNITS", "AVG CLV (NO-VIG)", "+CLV RATE"].map((h) => (
                 <th key={h} className="label-caps px-4 py-2 font-normal">{h}</th>
               ))}
             </tr>
@@ -77,8 +102,10 @@ export default function Performance() {
                 <td className="px-4 py-2.5 tabular-nums">{pct(sp.winRate, 0)}</td>
                 <td className={cn("px-4 py-2.5 tabular-nums", sp.roi >= 0 ? "text-pos" : "text-neg")}>{signedPct(sp.roi)}</td>
                 <td className={cn("px-4 py-2.5 tabular-nums", sp.units >= 0 ? "text-pos" : "text-neg")}>{sp.units.toFixed(1)}u</td>
-                <td className={cn("px-4 py-2.5 tabular-nums", sp.avgClv >= 0 ? "text-pos" : "text-neg")}>{sp.avgClv.toFixed(2)}%</td>
-                <td className="px-4 py-2.5 tabular-nums">{pct(sp.posClvPct, 0)}</td>
+                <td className={cn("px-4 py-2.5 tabular-nums", (sp.avgClvNoVig ?? sp.avgClv) >= 0 ? "text-pos" : "text-neg")}>
+                  {sp.avgClvNoVig !== null ? `${sp.avgClvNoVig.toFixed(2)}%` : `${sp.avgClv.toFixed(2)}%*`}
+                </td>
+                <td className="px-4 py-2.5 tabular-nums">{pct(sp.posClvNoVigPct ?? sp.posClvPct, 0)}</td>
               </tr>
             ))}
           </tbody>
@@ -162,7 +189,9 @@ export default function Performance() {
                   {r.result}
                 </td>
                 <td className={cn("px-4 py-2.5 tabular-nums", num(r.units) >= 0 ? "text-pos" : "text-neg")}>{num(r.units).toFixed(2)}</td>
-                <td className={cn("px-4 py-2.5 tabular-nums", num(r.clv) >= 0 ? "text-pos" : "text-neg")}>{num(r.clv).toFixed(2)}%</td>
+                <td className={cn("px-4 py-2.5 tabular-nums", num(r.clvNoVig ?? r.clv) >= 0 ? "text-pos" : "text-neg")}>
+                  {r.clvNoVig !== null ? `${num(r.clvNoVig).toFixed(2)}%` : `${num(r.clv).toFixed(2)}%*`}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -181,10 +210,14 @@ export default function Performance() {
           * CLV (Closing Line Value) measures whether our pick got a better
           price than the final odds right before the game started — the
           "closing line" is widely considered the sharpest price the market
-          produces. AVG CLV is the average amount we beat that price by, and
-          +CLV RATE is how often we beat it. Consistently positive CLV is the
+          produces. We measure it against the NO-VIG closing price (the
+          sportsbook's margin removed), which is the honest version — a price
+          can appear to beat the raw close while the true fair value moved
+          against it. AVG CLV is the average amount we beat the fair close
+          by, and +CLV RATE is how often. Consistently positive CLV is the
           strongest single sign of a real, lasting edge — even more than
-          short-term win rate.
+          short-term win rate. A CLV marked * is measured against the raw
+          close because a full no-vig market wasn't available for that pick.
         </p>
         <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
           * MAX DRAWDOWN is the largest peak-to-trough drop the units curve
