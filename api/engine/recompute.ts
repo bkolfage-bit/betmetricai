@@ -5,12 +5,13 @@ import {
   alerts,
   events,
   oddsSnapshots,
+  pickHistory,
   predictions,
   sports,
   sportsbooks,
   teamRatings,
 } from "@db/schema";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   americanToImplied,
   fmtLine,
@@ -56,6 +57,31 @@ export interface ComputedVersion {
 }
 
 /** Latest prediction for an event (prefers live rows for live events). */
+/**
+ * Provisional trust for freshly deployed rating pools. A fresh Elo overshoots
+ * most on lopsided matchups, so while a sport has few graded picks under its
+ * current ratings, a HUGE claimed edge against a deep market reads as model
+ * error, not opportunity: beyond the cap, bet grades are withheld (the pick
+ * still publishes as PASS — never hidden, never deleted). Lifts automatically
+ * once the sport has PROVISIONAL_MIN_GRADED settled rows.
+ */
+const PROVISIONAL_MIN_GRADED = 30;
+const PROVISIONAL_EV_CAP = 0.25;
+
+const gradedCountCache = new Map<string, { n: number; at: number }>();
+export async function gradedCountForSport(sportCode: string): Promise<number> {
+  const hit = gradedCountCache.get(sportCode);
+  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.n;
+  const db = getDb();
+  const rows = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(pickHistory)
+    .where(eq(pickHistory.sportCode, sportCode));
+  const n = Number(rows[0]?.n ?? 0);
+  gradedCountCache.set(sportCode, { n, at: Date.now() });
+  return n;
+}
+
 export async function latestPrediction(eventId: number, live = false) {
   const db = getDb();
   const rows = await db
@@ -285,7 +311,7 @@ export async function computePickVersion(
     pick.selection,
     !!like.drawProb,
   );
-  const anchoredProb = shrinkTowardMarket(calibratedProb, consensus, market, anchorCfg);
+  const anchoredProb = shrinkTowardMarket(calibratedProb, consensus, market, anchorCfg, sport.code);
 
   // edge/EV are computed from the WORKING probability, not the raw model
   const probEdge = anchoredProb - noVigProb;
@@ -341,6 +367,11 @@ export async function computePickVersion(
   const minEv = thresholds.minEv + guard.minEvBoost;
   let status = statusForScore(edgeScore, thresholds);
   if (evPerUnit < minEv && status !== "PASS") status = "PASS";
+  // provisional EV cap for unproven sports (see constants above)
+  const graded = await gradedCountForSport(sport.code);
+  if (graded < PROVISIONAL_MIN_GRADED && evPerUnit > PROVISIONAL_EV_CAP && status !== "PASS") {
+    status = "PASS";
+  }
 
   // moneyline "value cutoff" is priced off the working probability too
   const betUpToValue =

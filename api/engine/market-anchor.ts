@@ -124,6 +124,11 @@ export interface AnchorConfig {
   enabled: boolean;
   /** model weight per market; (1 - w) goes to the market consensus */
   modelWeight: { moneyline: number; spread: number; total: number };
+  /** per-sport overrides, multiplied onto the base weights. Newly-deployed
+   *  rating pools (college sports) carry training-sample bias a mature model
+   *  wouldn't, so the market gets more say until a graded record proves the
+   *  disagreement is real. */
+  sportWeight?: Record<string, number>;
 }
 
 export const DEFAULT_ANCHOR: AnchorConfig = {
@@ -131,6 +136,13 @@ export const DEFAULT_ANCHOR: AnchorConfig = {
   // totals are the softest market (model keeps most say); moneylines in big
   // sports are the sharpest (market gets the most say)
   modelWeight: { moneyline: 0.6, spread: 0.65, total: 0.7 },
+  // NCAAF: ratings were calibrated in a single deployment from ~3 seasons of
+  // scores, and a fresh Elo overshoots worst on lopsided matchups (it kept
+  // claiming +40% EV on -110 spreads vs 18-book markets). 0.35 puts the
+  // sport near the trust given to sharp moneylines: effective moneyline
+  // weight 0.21, spread 0.23, total 0.25. Raise toward 1.0 only after the
+  // sport posts a positive no-vig CLV record under these ratings.
+  sportWeight: { NCAAF: 0.35 },
 };
 
 const ANCHOR_KEY = "market_anchor";
@@ -144,6 +156,7 @@ export async function getAnchorConfig(): Promise<AnchorConfig> {
     return {
       enabled: j.enabled ?? true,
       modelWeight: { ...DEFAULT_ANCHOR.modelWeight, ...(j.modelWeight ?? {}) },
+      sportWeight: { ...DEFAULT_ANCHOR.sportWeight, ...(j.sportWeight ?? {}) },
     };
   } catch {
     return DEFAULT_ANCHOR;
@@ -160,9 +173,13 @@ export function shrinkTowardMarket(
   consensus: ConsensusFair | null,
   market: "moneyline" | "spread" | "total",
   cfg: AnchorConfig,
+  sportCode?: string,
 ): number {
   if (!cfg.enabled || !consensus) return modelProb;
   let wModel = cfg.modelWeight[market];
+  if (sportCode && cfg.sportWeight?.[sportCode] !== undefined) {
+    wModel *= cfg.sportWeight[sportCode];
+  }
   if (consensus.books < 2) wModel = (1 + wModel) / 2; // half-strength anchor
   const p = wModel * modelProb + (1 - wModel) * consensus.prob;
   return Math.min(0.999, Math.max(0.001, p));
