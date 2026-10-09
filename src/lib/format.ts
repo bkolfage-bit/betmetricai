@@ -41,11 +41,14 @@ export function timeAgo(input: Date | string | null | undefined): string {
 export function fmtTime(input: Date | string | null | undefined): string {
   if (!input) return "—";
   const d = typeof input === "string" ? new Date(input) : input;
+  // no timeZone option → the browser's own local zone is used,
+  // and timeZoneName labels it so users know the times are theirs
   return d.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZoneName: "short",
   });
 }
 
