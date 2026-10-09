@@ -80,6 +80,14 @@ async function fairProbAt(
   return idx >= 0 ? noVigN(odds)[idx] : null;
 }
 
+/** Typical wall-clock duration per sport (minutes), mirroring the live-sync
+ *  estimates — used to record when a game actually finished. */
+const EST_GAME_MINUTES: Record<string, number> = {
+  MLB: 200, SOCCER: 115, NHL: 150, NBA: 145, NFL: 200, NCAAF: 200,
+  NCAAB: 130, TENNIS: 140, UFC: 60, GOLF: 300,
+};
+const estGameMinutes = (code: string) => EST_GAME_MINUTES[code] ?? 150;
+
 type GradeResult = "won" | "lost" | "push";
 
 function gradePick(
@@ -308,6 +316,13 @@ export async function gradeEventPicks(eventId: number): Promise<number> {
           ? `${sideAbbr} ${fmtLine(line)}`
           : `${pick.selection === "over" ? "Over" : "Under"} ${line}`;
 
+    // real-world completion time: kickoff + the sport's typical wall-clock
+    // duration (the score feed doesn't carry an end timestamp). Never the
+    // import time — a late score sync must not look like a late finish.
+    const completedAt = new Date(
+      event.startTime.getTime() + estGameMinutes(sport.code) * 60_000,
+    );
+
     await db.insert(pickHistory).values({
       sportCode: sport.code,
       market: pick.market,
@@ -322,6 +337,7 @@ export async function gradeEventPicks(eventId: number): Promise<number> {
       clvNoVig: clvNoVig === null ? null : clvNoVig.toFixed(3),
       closeFairProb: fairClose === null ? null : fairClose.toFixed(4),
       placedAt: v1.createdAt, // original publication time — never backdated
+      completedAt,
       pickId: pick.id,
     });
     graded++;

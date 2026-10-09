@@ -171,7 +171,7 @@ export default function Performance() {
         <table className="w-full min-w-[720px] border-collapse font-mono2 text-xs">
           <thead>
             <tr className="border-b border-border text-left">
-              {["DATE", "SPORT", "EVENT", "SELECTION", "ODDS", "EDGE", "RESULT", "UNITS", "CLV"].map((h) => (
+              {["FINAL", "SPORT", "EVENT", "SELECTION", "ODDS", "EDGE", "RESULT", "UNITS", "CLV"].map((h) => (
                 <th key={h} className="label-caps px-4 py-2 font-normal">{h}</th>
               ))}
             </tr>
@@ -179,7 +179,7 @@ export default function Performance() {
           <tbody>
             {data.recent.map((r) => (
               <tr key={r.id} className="border-b border-border/60 last:border-0 hover:bg-secondary/50">
-                <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">{fmtTime(r.placedAt)}</td>
+                <td className="whitespace-nowrap px-4 py-2.5 text-muted-foreground">{fmtTime(r.completedAt ?? r.placedAt)}</td>
                 <td className="px-4 py-2.5 font-bold text-muted-foreground">{r.sportCode}</td>
                 <td className="px-4 py-2.5">{r.eventLabel}</td>
                 <td className="whitespace-nowrap px-4 py-2.5 font-bold">{r.selection}</td>

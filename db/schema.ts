@@ -341,6 +341,10 @@ export const pickHistory = mysqlTable("pick_history", {
   /** no-vig fair probability of the selection at the close — the market's answer key */
   closeFairProb: decimal("closeFairProb", { precision: 5, scale: 4 }),
   placedAt: timestamp("placedAt").notNull(),
+  /** when the game actually finished (real-world completion), not when our
+   *  feed happened to import the result. Charts/month grouping use this so a
+   *  late score-sync doesn't make a pick look graded at import time. */
+  completedAt: timestamp("completedAt"),
   // Grading idempotency key (plain column, no FK: graded history must
   // survive any later pick cleanup — history is never altered).
   pickId: bigint("pickId", { mode: "number", unsigned: true }),

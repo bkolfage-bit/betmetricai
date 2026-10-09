@@ -2,8 +2,12 @@ import { z } from "zod";
 import { createRouter, publicQuery } from "../middleware";
 import { getDb } from "../queries/connection";
 import { pickHistory } from "@db/schema";
-import { asc } from "drizzle-orm";
 import { americanPayout } from "../lib/edge";
+
+/** The timestamp that defines where a graded pick sits on the timeline:
+ *  real game-completion time, falling back to publication for legacy rows. */
+const when = (r: typeof pickHistory.$inferSelect): Date =>
+  r.completedAt ?? r.placedAt;
 
 function summarize(rows: Array<typeof pickHistory.$inferSelect>) {
   const wins = rows.filter((r) => r.result === "won").length;
@@ -58,10 +62,12 @@ export const performanceRouter = createRouter({
     .input(z.object({ sport: z.string().optional() }).optional())
     .query(async ({ input }) => {
     const db = getDb();
-    const all = await db
+    const all = (await db
       .select()
-      .from(pickHistory)
-      .orderBy(asc(pickHistory.placedAt));
+      .from(pickHistory))
+      // timeline = real game-completion time (fall back to publication for
+      // any row graded before completedAt existed)
+      .sort((a, b) => when(a).getTime() - when(b).getTime());
     const rows = input?.sport ? all.filter((r) => r.sportCode === input.sport) : all;
 
     const overall = summarize(rows);
@@ -90,7 +96,8 @@ export const performanceRouter = createRouter({
 
     const byMonth = new Map<string, typeof rows>();
     for (const r of rows) {
-      const key = `${r.placedAt.getFullYear()}-${String(r.placedAt.getMonth() + 1).padStart(2, "0")}`;
+      const d = when(r);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       const arr = byMonth.get(key) ?? [];
       arr.push(r);
       byMonth.set(key, arr);
@@ -107,7 +114,7 @@ export const performanceRouter = createRouter({
       cum += parseFloat(r.units);
       peak = Math.max(peak, cum);
       maxDrawdown = Math.max(maxDrawdown, peak - cum);
-      return { at: r.placedAt, units: Math.round(cum * 100) / 100 };
+      return { at: when(r), units: Math.round(cum * 100) / 100 };
     });
 
     return {
