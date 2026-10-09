@@ -354,7 +354,7 @@ export async function computePickVersion(
     dataQuality: 0.9,
     weights,
   });
-  const edgeScore = ratingsCalibrated ? rawScore : Math.min(rawScore, 50);
+  let edgeScore = ratingsCalibrated ? rawScore : Math.min(rawScore, 50);
   const thresholds = await getThresholds();
   const model = SPORT_MODELS[sport.code];
 
@@ -372,6 +372,11 @@ export async function computePickVersion(
   if (graded < PROVISIONAL_MIN_GRADED && evPerUnit > PROVISIONAL_EV_CAP && status !== "PASS") {
     status = "PASS";
   }
+  // score/status coherence: when a gate (EV floor, guardrail, provisional
+  // cap) distrusts the claimed edge enough to force PASS, the displayed
+  // score must not contradict it. Cap at HOLD's ceiling so a distrusted
+  // pick never shows "100 PASS".
+  if (status === "PASS") edgeScore = Math.min(edgeScore, thresholds.hold - 1);
 
   // moneyline "value cutoff" is priced off the working probability too
   const betUpToValue =
