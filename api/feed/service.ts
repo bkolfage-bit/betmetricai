@@ -580,8 +580,13 @@ export async function ensurePrediction(eventId: number, sportCode: string): Prom
  */
 export async function ensureEventPicks(eventId: number, sportCode: string): Promise<void> {
   const db = getDb();
-  const [existing] = await db.select({ id: aiPicks.id }).from(aiPicks).where(eq(aiPicks.eventId, eventId)).limit(1);
-  if (existing) return;
+  // completeness, not just existence: an event that already has a spread pick
+  // still needs its moneyline pick once it comes inside the moneyline window.
+  const existingRows = await db
+    .select({ market: aiPicks.market })
+    .from(aiPicks)
+    .where(eq(aiPicks.eventId, eventId));
+  const existingMarkets = new Set(existingRows.map((r) => r.market));
   const [pred] = await db.select().from(predictions).where(eq(predictions.eventId, eventId)).orderBy(desc(predictions.id)).limit(1);
   const [ev] = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
   if (!pred || !ev) return;
@@ -628,14 +633,14 @@ export async function ensureEventPicks(eventId: number, sportCode: string): Prom
   const median = (xs: number[]) => (xs.length === 0 ? null : xs[Math.floor(xs.length / 2)]);
 
   const creates: Array<{ market: "moneyline" | "spread" | "total"; selection: string }> = [];
-  if (model.pickMarkets.includes("spread")) {
+  if (model.pickMarkets.includes("spread") && !existingMarkets.has("spread")) {
     const line = median(linesFor("spread", "home"));
     if (line !== null) {
       const pHome = marketProbability(like, "spread", "home", line);
       if (Number.isFinite(pHome)) creates.push({ market: "spread", selection: pHome >= 0.5 ? "home" : "away" });
     }
   }
-  if (model.pickMarkets.includes("total")) {
+  if (model.pickMarkets.includes("total") && !existingMarkets.has("total")) {
     const line = median(linesFor("total", "over"));
     if (line !== null) {
       const pOver = marketProbability(like, "total", "over", line);
@@ -646,7 +651,7 @@ export async function ensureEventPicks(eventId: number, sportCode: string): Prom
   // beyond the forecast horizon there is no analysis at all.
   const hoursOut = (ev.startTime.getTime() - Date.now()) / 3_600_000;
   if (hoursOut > FORECAST_HORIZON_DAYS * 24) return;
-  if (model.pickMarkets.includes("moneyline") && (hoursOut < 30 || sportCode === "UFC" || sportCode === "TENNIS")) {
+  if (model.pickMarkets.includes("moneyline") && !existingMarkets.has("moneyline") && (hoursOut < 30 || sportCode === "UFC" || sportCode === "TENNIS")) {
     const hasMl = rows.some((r) => r.market === "moneyline");
     if (hasMl) {
       const hwp = parseFloat(pred.homeWinProb);
@@ -1196,10 +1201,16 @@ export async function syncSportOdds(
             .where(eq(sportsbooks.id, bookId));
         }
 
-        /* ---- phase 4: dynamic pick recalculation for moved events ---- */
+        /* ---- phase 4: pick creation for every in-horizon event, recalc for moved ----
+         * Creation can't be gated on odds movement alone: books that don't move a
+         * line report unchanged provider timestamps, the dedup layer skips them,
+         * and the event would never get picks at all. ensurePrediction /
+         * ensureEventPicks are idempotent, so running them per sync is cheap. */
+        for (const p of pending) {
+          const ok = await ensurePrediction(p.eventId, sportCode);
+          if (ok) await ensureEventPicks(p.eventId, sportCode);
+        }
         for (const eventId of movedEvents) {
-          const ok = await ensurePrediction(eventId, sportCode);
-          if (ok) await ensureEventPicks(eventId, sportCode);
           await recomputeEventPicks(eventId);
         }
       }
