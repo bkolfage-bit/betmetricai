@@ -114,9 +114,9 @@ export default function Performance() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* by market */}
-        <section className="panel overflow-hidden rounded-sm">
+        <section className="panel overflow-x-auto rounded-sm">
           <p className="label-caps border-b border-border px-4 py-3">Performance by market</p>
-          <table className="w-full border-collapse font-mono2 text-xs">
+          <table className="w-full min-w-[560px] border-collapse font-mono2 text-xs">
             <thead>
               <tr className="border-b border-border text-left">
                 {["MARKET", "PICKS", "WIN%", "ROI", "UNITS", "AVG CLV"].map((h) => (
@@ -140,9 +140,9 @@ export default function Performance() {
         </section>
 
         {/* by month */}
-        <section className="panel overflow-hidden rounded-sm">
+        <section className="panel overflow-x-auto rounded-sm">
           <p className="label-caps border-b border-border px-4 py-3">Performance by month</p>
-          <table className="w-full border-collapse font-mono2 text-xs">
+          <table className="w-full min-w-[480px] border-collapse font-mono2 text-xs">
             <thead>
               <tr className="border-b border-border text-left">
                 {["MONTH", "PICKS", "WIN%", "ROI", "UNITS"].map((h) => (
