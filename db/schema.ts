@@ -321,6 +321,7 @@ export const playerProps = mysqlTable("player_props", {
   evOver: decimal("evOver", { precision: 6, scale: 4 }).notNull(),
   lean: varchar("lean", { length: 8 }), // "over" | "under" — the value side
   evLean: decimal("evLean", { precision: 6, scale: 4 }), // anchored EV of the lean side
+  status: varchar("status", { length: 16 }).default("PASS").notNull(), // PASS | WATCH | BET | STRONG_BET
   edgeScore: int("edgeScore").notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });

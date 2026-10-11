@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { trpc } from "@/providers/trpc";
 import { useSportFilter } from "@/providers/sport-filter";
-import { EmptyState, SectionHead } from "@/components/bits";
+import { EmptyState, SectionHead, StatusBadge } from "@/components/bits";
 import { Seo } from "@/components/Seo";
 import { ProTeaser } from "@/components/ProTeaser";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,7 +31,7 @@ export default function Props() {
 
       <SectionHead
         title="Player props"
-        sub="Individual player stat lines compared against our AI's projection for that player. The number on each card is the edge score — how far our projection beats the sportsbook's price (higher = bigger edge). Scores are capped below bet-grade until enough settled results prove the props model; nothing here is a bet recommendation yet."
+        sub="Individual player stat lines compared against our AI's projection for that player. Cards carry the same labels as game picks — but until enough settled results prove the props model, nothing here can grade above WATCH. PASS means no real edge; WATCH means the projection beats the price but the model is still unproven."
       />
 
       <div className="flex flex-wrap gap-1.5">
@@ -68,12 +68,10 @@ export default function Props() {
                     {sportCode} · {prop.teamAbbr} · {prop.market} · {away.abbr}@{home.abbr}
                   </p>
                 </div>
-                <div className="flex flex-col items-end">
-                  <span className={cn("font-mono2 text-lg font-extrabold tabular-nums", strong ? "text-pos" : "text-muted-foreground")}>
+                <div className="flex flex-col items-end gap-1">
+                  <StatusBadge status={(prop.status ?? "PASS") as never} />
+                  <span className="font-mono2 text-[10px] tabular-nums text-muted-foreground">
                     {prop.edgeScore}
-                  </span>
-                  <span className="font-mono2 text-[8px] uppercase tracking-[0.14em] text-muted-foreground/70">
-                    {strong ? "edge" : "provisional"}
                   </span>
                 </div>
               </div>
@@ -135,9 +133,7 @@ export default function Props() {
                         {sportCode} · {prop.teamAbbr} · {prop.market} · {away.abbr}@{home.abbr}
                       </p>
                     </div>
-                    <span className="font-mono2 text-lg font-extrabold tabular-nums text-muted-foreground">
-                      {prop.edgeScore}
-                    </span>
+                    <StatusBadge status={(prop.status ?? "PASS") as never} />
                   </div>
                   <div className="flex items-end justify-between gap-3">
                     <div>

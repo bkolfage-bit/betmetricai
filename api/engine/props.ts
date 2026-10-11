@@ -279,6 +279,17 @@ export function propEdgeScore(leanEv: number, graded: number): number {
   return Math.max(0, Math.min(100, Math.round(50 + 350 * leanEv)));
 }
 
+/** Status label. While unproven, the cap makes BET/STRONG_BET unreachable —
+ *  the best a prop can say is WATCH. Full thresholds unlock after grading
+ *  proves calibration (mirrors the game-line ladder 90/80/70/60). */
+export function propStatus(score: number, graded: number): string {
+  if (graded < PROP_MIN_GRADED) return score >= 40 ? "WATCH" : "PASS";
+  if (score >= 90) return "STRONG_BET";
+  if (score >= 80) return "BET";
+  if (score >= 70) return "WATCH";
+  return "PASS";
+}
+
 /**
  * Pull props for NHL events starting within `hoursAhead`, project them, and
  * upsert into player_props. Costs real credits (measured and returned).
@@ -425,6 +436,7 @@ export async function analyzeEventProps(
       evOver: String(evOver.toFixed(4)),
       lean: leanOver ? "over" : "under",
       evLean: String(leanEv.toFixed(4)),
+      status: propStatus(propEdgeScore(leanEv, graded), graded),
       edgeScore: propEdgeScore(leanEv, graded),
       updatedAt: new Date(),
     };
@@ -440,7 +452,7 @@ export async function analyzeEventProps(
         eventId, player: g.player, teamAbbr: rate.teamAbbr, market: g.marketKey,
         line: payload.line, overOdds: payload.overOdds, underOdds: payload.underOdds,
         projValue: payload.projValue, probOver: payload.probOver, evOver: payload.evOver,
-        lean: payload.lean, evLean: payload.evLean,
+        lean: payload.lean, evLean: payload.evLean, status: payload.status,
         edgeScore: payload.edgeScore, sportsbookId: bestBook,
       });
     }
