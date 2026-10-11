@@ -8,7 +8,7 @@ import {
   sportsbooks,
   teams,
 } from "@db/schema";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 
 const homeTeams = alias(teams, "home_teams");
@@ -32,7 +32,8 @@ export const propsRouter = createRouter({
       .innerJoin(homeTeams, eq(events.homeTeamId, homeTeams.id))
       .innerJoin(awayTeams, eq(events.awayTeamId, awayTeams.id))
       .innerJoin(sportsbooks, eq(playerProps.sportsbookId, sportsbooks.id))
-      .orderBy(desc(playerProps.edgeScore));
+      .where(and(eq(sports.code, "NHL"), ne(events.status, "final")))
+      .orderBy(desc(playerProps.evLean));
     return rows;
   }),
 });

@@ -55,9 +55,9 @@ export default function Props() {
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {rows.map(({ prop, home, away, book, sportCode }) => {
           const probOver = num(prop.probOver);
-          const lean = probOver >= 0.5 ? "OVER" : "UNDER";
-          const leanProb = Math.max(probOver, 1 - probOver);
-          const ev = num(prop.evOver);
+          const lean = prop.lean ? prop.lean.toUpperCase() : probOver >= 0.5 ? "OVER" : "UNDER";
+          const leanProb = lean === "OVER" ? probOver : 1 - probOver;
+          const ev = prop.evLean != null ? num(prop.evLean) : num(prop.evOver);
           const strong = prop.edgeScore >= 70;
           return (
             <div key={prop.id} className="panel flex flex-col gap-3 rounded-sm p-4 transition-colors hover:border-primary/30">
@@ -104,7 +104,7 @@ export default function Props() {
                 <span>
                   {book.name} O{fmtOdds(prop.overOdds)} / U{fmtOdds(prop.underOdds)}
                 </span>
-                <span className={ev >= 0 ? "text-pos" : "text-neg"}>EV(over) {signedPct(ev)}</span>
+                <span className={ev >= 0 ? "text-pos" : "text-neg"}>EV({lean.toLowerCase()}) {signedPct(ev)}</span>
                 <span>{timeAgo(prop.updatedAt)}</span>
               </div>
             </div>
@@ -119,8 +119,8 @@ export default function Props() {
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {rows.map(({ prop, home, away, book, sportCode }) => {
               const probOver = num(prop.probOver);
-              const lean = probOver >= 0.5 ? "OVER" : "UNDER";
-              const leanProb = Math.max(probOver, 1 - probOver);
+              const lean = prop.lean ? prop.lean.toUpperCase() : probOver >= 0.5 ? "OVER" : "UNDER";
+              const leanProb = lean === "OVER" ? probOver : 1 - probOver;
               return (
                 <div key={prop.id} className="panel flex flex-col gap-3 rounded-sm p-4">
                   <div className="flex items-start justify-between gap-2">

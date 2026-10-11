@@ -165,4 +165,43 @@ export const feedRouter = createRouter({
     .mutation(async ({ input }) =>
       syncEventProps(input.sportCode.toUpperCase(), input.providerEventId, input.marketKeys),
     ),
+
+  /** Admin: credit-cost estimate for an NHL props sweep BEFORE spending. */
+  estimateNhlPropsSweep: adminQuery.query(async () => {
+    const { estimatePropsCost } = await import("../feed/service");
+    const { getDb } = await import("../queries/connection");
+    const { events, sports } = await import("@db/schema");
+    const { and, eq, gte, sql } = await import("drizzle-orm");
+    const db = getDb();
+    const rows = await db
+      .select({ id: events.id })
+      .from(events)
+      .innerJoin(sports, eq(events.sportId, sports.id))
+      .where(and(
+        eq(sports.code, "NHL"),
+        eq(events.status, "scheduled"),
+        gte(events.startTime, new Date()),
+        sql`${events.startTime} < DATE_ADD(NOW(), INTERVAL 36 HOUR)`,
+      ));
+    const markets = 3; // points, shots, anytime-goal
+    return {
+      eventsInWindow: rows.length,
+      estimatedCredits: estimatePropsCost(rows.length, new Array(markets).fill("x")),
+      note: "1 credit per market per region per event; 3 markets, 1 region",
+    };
+  }),
+
+  /** Admin: on-demand NHL props sweep (paid, measured — same as scheduler). */
+  syncNhlPropsNow: adminQuery.mutation(async () => {
+    const { syncNhlProps } = await import("../engine/props");
+    return syncNhlProps(36);
+  }),
+
+  /** Admin: backfill NHL player boxscores over a date range (free API). */
+  backfillNhlPlayerLogs: adminQuery
+    .input(z.object({ startDate: z.string(), endDate: z.string() }))
+    .mutation(async ({ input }) => {
+      const { ingestNhlPlayerRange } = await import("../engine/props");
+      return ingestNhlPlayerRange(new Date(input.startDate), new Date(input.endDate));
+    }),
 });

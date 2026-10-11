@@ -9,6 +9,7 @@ import {
   int,
   bigint,
   decimal,
+  unique,
 } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
@@ -318,6 +319,8 @@ export const playerProps = mysqlTable("player_props", {
   projValue: decimal("projValue", { precision: 6, scale: 1 }).notNull(),
   probOver: decimal("probOver", { precision: 5, scale: 4 }).notNull(),
   evOver: decimal("evOver", { precision: 6, scale: 4 }).notNull(),
+  lean: varchar("lean", { length: 8 }), // "over" | "under" — the value side
+  evLean: decimal("evLean", { precision: 6, scale: 4 }), // anchored EV of the lean side
   edgeScore: int("edgeScore").notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -608,6 +611,38 @@ export const pmPriceSnapshots = mysqlTable("pm_price_snapshots", {
  * corpus for the v2 models — real historical outcomes only, never
  * fabricated. Deduped by (sportCode, source, sourceGameId).
  */
+/** Real per-player game results from free official APIs (NHL boxscores).
+ *  The foundation of the player-prop model: rolling stats are computed only
+ *  from rows here — never fabricated. */
+export const playerGameLogs = mysqlTable("player_game_logs", {
+  id: serial("id").primaryKey(),
+  sportCode: varchar("sportCode", { length: 16 }).notNull(),
+  playerId: varchar("playerId", { length: 32 }).notNull(), // provider player id
+  player: varchar("player", { length: 64 }).notNull(),
+  teamAbbr: varchar("teamAbbr", { length: 8 }).notNull(),
+  gameDate: varchar("gameDate", { length: 10 }).notNull(), // YYYY-MM-DD
+  /** stat bag: { goals, assists, points, shots, toiMinutes, ... } per sport */
+  stats: text("stats").notNull(),
+}, (t) => [unique("uq_player_game_logs").on(t.sportCode, t.playerId, t.gameDate)]);
+
+/** Graded prop record — same append-only discipline as pick_history. */
+export const propHistory = mysqlTable("prop_history", {
+  id: serial("id").primaryKey(),
+  sportCode: varchar("sportCode", { length: 16 }).notNull(),
+  market: varchar("market", { length: 64 }).notNull(),
+  eventLabel: varchar("eventLabel", { length: 128 }).notNull(),
+  player: varchar("player", { length: 64 }).notNull(),
+  selection: varchar("selection", { length: 128 }).notNull(),
+  odds: int("odds").notNull(),
+  line: decimal("line", { precision: 6, scale: 1 }),
+  modelProb: decimal("modelProb", { precision: 5, scale: 4 }),
+  result: mysqlEnum("result", ["won", "lost", "push"]).notNull(),
+  units: decimal("units", { precision: 6, scale: 2 }).notNull(),
+  placedAt: timestamp("placedAt").notNull(),
+  completedAt: timestamp("completedAt"),
+  pickId: bigint("pickId", { mode: "number", unsigned: true }), // idempotency key = player_props.id
+});
+
 export const gameResults = mysqlTable("game_results", {
   id: serial("id").primaryKey(),
   sportCode: varchar("sportCode", { length: 16 }).notNull(),

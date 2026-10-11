@@ -37,12 +37,18 @@ const PM_INTERVAL_MS = 10 * 60 * 1000; // prediction markets: free public APIs
 const V2_INTERVAL_MS = 24 * 60 * 60 * 1000; // v2 model re-train/validate daily
 const HEALTH_INTERVAL_MS = 30 * 60 * 1000; // recompute real model health
 const SWEEP_INTERVAL_MS = 15 * 60 * 1000; // re-price every open pick
+const PROPS_INTERVAL_MS = 6 * 60 * 60 * 1000; // NHL props pull: 4x/day (paid)
+const PROPS_GRADE_INTERVAL_MS = 60 * 60 * 1000; // grade settled props hourly
+const DISCOVERY_INTERVAL_MS = 6 * 60 * 60 * 1000; // full-sport sweep: finds NEW events
 let lastOutrightsRun = 0;
 let lastScoresRun = 0;
 let lastPmRun = 0;
 let lastV2Run = 0;
 let lastHealthRun = 0;
 let lastSweepRun = 0;
+let lastPropsRun = 0;
+let lastPropsGradeRun = 0;
+let lastDiscoveryRun = 0;
 
 let timer: NodeJS.Timeout | null = null;
 let running = false;
@@ -101,11 +107,41 @@ async function tick(): Promise<void> {
       }
     }
 
+    // prop grading (free, runs in every mode): settle NHL props from real
+    // boxscores once their events are final. Append-only.
+    if (now - lastPropsGradeRun >= PROPS_GRADE_INTERVAL_MS) {
+      lastPropsGradeRun = now;
+      try {
+        const { gradeNhlProps } = await import("../engine/props");
+        const n = await gradeNhlProps();
+        if (n > 0) console.log(`[props] graded ${n} NHL props from boxscores`);
+      } catch (e) {
+        console.error("[props] grading failed:", e instanceof Error ? e.message : e);
+      }
+    }
+
     const mode = await getFeedMode();
     if (mode !== "live") return;
 
     const quota = await getQuotaState();
     if (quota.tier === "suspended" || quota.tier === "critical") return;
+
+    // NHL props pull (paid): 4x/day, only for games inside 36h, and only
+    // when the quota tier is comfortable. Cost is measured per event and
+    // logged by syncEventProps like every other paid call.
+    if (now - lastPropsRun >= PROPS_INTERVAL_MS && (quota.tier === "normal" || quota.tier === "conservative")) {
+      lastPropsRun = now;
+      try {
+        const { syncNhlProps } = await import("../engine/props");
+        const r = await syncNhlProps(36);
+        console.log(
+          `[props] NHL: ${r.eventsWithProps}/${r.eventsTried} events pulled, ${r.rowsWritten} edges, cost ${r.credits}` +
+            (r.errors.length ? ` ERRORS: ${r.errors.join("; ").slice(0, 200)}` : ""),
+        );
+      } catch (e) {
+        console.error("[props] sync failed:", e instanceof Error ? e.message : e);
+      }
+    }
 
     const db = getDb();
 
@@ -113,6 +149,27 @@ async function tick(): Promise<void> {
     const mapRows = await db.select().from(oddsSportMap).where(eq(oddsSportMap.status, "active"));
     if (mapRows.length === 0) return;
     const codes = [...new Set(mapRows.map((r) => r.sportCode))];
+
+    // event-discovery sweep (paid, measured): the per-event loop below only
+    // refreshes games ALREADY in the database. Without this full-sport call,
+    // newly scheduled games never enter the system at all. 4x/day per sport,
+    // 3 credits each — cheap insurance against missed slates.
+    if (now - lastDiscoveryRun >= DISCOVERY_INTERVAL_MS && (quota.tier === "normal" || quota.tier === "conservative")) {
+      lastDiscoveryRun = now;
+      for (const code of codes) {
+        try {
+          const res = await syncSportOdds(code);
+          if (res.eventsWithOdds > 0 || res.errors.length > 0) {
+            console.log(
+              `[discovery] ${code}: ${res.eventsWithOdds} events, ${res.rowsWritten} rows, cost ${res.cost}` +
+                (res.errors.length ? ` ERRORS: ${res.errors.join("; ").slice(0, 200)}` : ""),
+            );
+          }
+        } catch (e) {
+          console.error(`[discovery] ${code} failed:`, e instanceof Error ? e.message : e);
+        }
+      }
+    }
 
     for (const code of codes) {
       // provider-sourced events in the polling window AND within the

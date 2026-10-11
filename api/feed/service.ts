@@ -1459,7 +1459,10 @@ export async function syncEventProps(
               eventId: evRow.id,
               sportsbookId: bookId,
               market: "prop" as const,
-              outcome: `${player}|${side}`,
+              // carry the provider market key so the analysis layer can tell
+              // points/shots/anytime-goal props apart (never invented — mkt.key
+              // comes straight from the provider payload)
+              outcome: `${player}|${side}|${mkt.key}`,
               line: o.point != null ? String(o.point) : null,
               americanOdds: american,
               decimalOdds: String(americanToDecimal(american)),
