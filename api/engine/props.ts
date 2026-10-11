@@ -9,9 +9,11 @@
  *   player_points               — Poisson(points rate)
  *   player_goal_scorer_anytime  — 1 - exp(-goal rate)
  *
- * Discipline (same as everything else): prop rows publish as analysis with
- * edgeScore 0 (no bet recommendation) until prop_history proves the
- * projections against real outcomes.
+ * Discipline (same as everything else): props carry a PROVISIONAL score that
+ * ranks them by anchored EV but is hard-capped below the BET threshold (60)
+ * until prop_history accumulates enough graded rows to prove calibration.
+ * The score compares value RELATIVE to other props — it is never a bet
+ * recommendation while the model is unproven.
  */
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { getDb } from "../queries/connection";
@@ -253,6 +255,30 @@ const NHL_PROP_MARKETS = ["player_points", "player_shots_on_goal", "player_goal_
 /** Minimum anchored EV to publish a prop edge at all. */
 const PROP_MIN_EV = 0.03;
 
+/** Provisional scoring: until PROP_MIN_GRADED settled props exist for the
+ *  sport, scores map anchored EV onto 0..59 (hard cap under the 60 BET line).
+ *  After that, the full 0..100 scale unlocks. */
+const PROP_MIN_GRADED = 30;
+const propGradedCache = new Map<string, { n: number; at: number }>();
+async function gradedPropCount(sportCode: string): Promise<number> {
+  const hit = propGradedCache.get(sportCode);
+  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.n;
+  const db = getDb();
+  const r: any = await db.execute(
+    sql`select count(*) as n from prop_history where sportCode = ${sportCode}`,
+  );
+  const n = Number((r[0]?.[0] ?? r[0])?.n ?? 0);
+  propGradedCache.set(sportCode, { n, at: Date.now() });
+  return n;
+}
+
+/** EV → display score. Provisional: 25% EV maps to 59 (cap). Proven: the
+ *  same 50 + 350·EV base shape as game-line picks. */
+export function propEdgeScore(leanEv: number, graded: number): number {
+  if (graded < PROP_MIN_GRADED) return Math.max(0, Math.min(59, Math.round(leanEv * 236)));
+  return Math.max(0, Math.min(100, Math.round(50 + 350 * leanEv)));
+}
+
 /**
  * Pull props for NHL events starting within `hoursAhead`, project them, and
  * upsert into player_props. Costs real credits (measured and returned).
@@ -316,6 +342,7 @@ export async function analyzeEventProps(
     .from(currentOdds)
     .where(and(eq(currentOdds.eventId, eventId), eq(currentOdds.market, "prop")));
   if (rows.length === 0) return 0;
+  const graded = await gradedPropCount("NHL");
 
   interface SideOffer { bookId: number; line: number | null; odds: number }
   interface LineGroup { player: string; marketKey: string; line: number; over: SideOffer[]; under: SideOffer[] }
@@ -398,7 +425,7 @@ export async function analyzeEventProps(
       evOver: String(evOver.toFixed(4)),
       lean: leanOver ? "over" : "under",
       evLean: String(leanEv.toFixed(4)),
-      edgeScore: 0, // unproven until prop_history proves the model
+      edgeScore: propEdgeScore(leanEv, graded),
       updatedAt: new Date(),
     };
     const existing = await db
@@ -414,7 +441,7 @@ export async function analyzeEventProps(
         line: payload.line, overOdds: payload.overOdds, underOdds: payload.underOdds,
         projValue: payload.projValue, probOver: payload.probOver, evOver: payload.evOver,
         lean: payload.lean, evLean: payload.evLean,
-        edgeScore: 0, sportsbookId: bestBook,
+        edgeScore: payload.edgeScore, sportsbookId: bestBook,
       });
     }
     written++;

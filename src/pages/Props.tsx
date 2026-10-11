@@ -31,7 +31,7 @@ export default function Props() {
 
       <SectionHead
         title="Player props"
-        sub="Individual player stat lines — points, yards, strikeouts and more — compared against our AI's projection for that player. Only markets with enough reliable player data are shown."
+        sub="Individual player stat lines compared against our AI's projection for that player. The number on each card is the edge score — how far our projection beats the sportsbook's price (higher = bigger edge). Scores are capped below bet-grade until enough settled results prove the props model; nothing here is a bet recommendation yet."
       />
 
       <div className="flex flex-wrap gap-1.5">
@@ -68,9 +68,14 @@ export default function Props() {
                     {sportCode} · {prop.teamAbbr} · {prop.market} · {away.abbr}@{home.abbr}
                   </p>
                 </div>
-                <span className={cn("font-mono2 text-lg font-extrabold tabular-nums", strong ? "text-pos" : "text-muted-foreground")}>
-                  {prop.edgeScore}
-                </span>
+                <div className="flex flex-col items-end">
+                  <span className={cn("font-mono2 text-lg font-extrabold tabular-nums", strong ? "text-pos" : "text-muted-foreground")}>
+                    {prop.edgeScore}
+                  </span>
+                  <span className="font-mono2 text-[8px] uppercase tracking-[0.14em] text-muted-foreground/70">
+                    {strong ? "edge" : "provisional"}
+                  </span>
+                </div>
               </div>
 
               <div className="flex items-end justify-between gap-3">
