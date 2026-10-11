@@ -79,11 +79,13 @@ const PIPELINE = [
 ];
 
 export default function Home() {
-  const { isVisible } = useSportFilter();
+  const { sport, isVisible } = useSportFilter();
   const { user } = useAuth();
   const isPro = user?.plan === "pro" || user?.role === "admin";
   const { data: picks } = trpc.picks.list.useQuery(undefined, { refetchInterval: 20000 });
-  const { data: perf } = trpc.performance.summary.useQuery();
+  const { data: perf } = trpc.performance.summary.useQuery(
+    sport ? { sport } : undefined,
+  );
   const top = (picks?.picks ?? [])
     .filter((p) => p.version && p.version.status !== "PASS" && isVisible(p.sportCode))
     .slice(0, 3);
@@ -134,20 +136,32 @@ export default function Home() {
               </Link>
             )}
           </div>
-          {perf && (
-            <div className="mt-8 flex flex-wrap items-center gap-x-8 gap-y-3 font-mono2">
-              {[
-                ["WIN RATE", pct(perf.overall.winRate)],
-                ["ROI", signedPct(perf.overall.roi)],
-                ["UNITS", `${num(perf.overall.units) >= 0 ? "+" : ""}${num(perf.overall.units).toFixed(1)}u`],
-                ["VS CLOSING LINE", `${num(perf.overall.avgClv) >= 0 ? "+" : ""}${num(perf.overall.avgClv).toFixed(2)}%`],
-              ].map(([k, val]) => (
-                <div key={k}>
-                  <p className="label-caps" style={{ fontSize: 8 }}>{k}</p>
-                  <p className="text-lg font-bold tabular-nums">{val}</p>
-                </div>
-              ))}
-              {curve.length > 2 && <Sparkline points={curve} width={140} height={36} color="#34d399" baseline={0} />}
+          {perf && perf.overall.total === 0 && sport && (
+            <p className="mt-8 font-mono2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              No graded {sport} picks yet — the record builds as games finish.
+            </p>
+          )}
+          {perf && perf.overall.total > 0 && (
+            <div className="mt-8">
+              <p className="mb-2 font-mono2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground/70">
+                {sport
+                  ? `Graded record — ${sport} only · ${perf.overall.total} pick${perf.overall.total === 1 ? "" : "s"}`
+                  : `Graded record — all sports · ${perf.overall.total} picks`}
+              </p>
+              <div className="flex flex-wrap items-center gap-x-8 gap-y-3 font-mono2">
+                {[
+                  ["WIN RATE", pct(perf.overall.winRate)],
+                  ["ROI", signedPct(perf.overall.roi)],
+                  ["UNITS", `${num(perf.overall.units) >= 0 ? "+" : ""}${num(perf.overall.units).toFixed(1)}u`],
+                  ["VS CLOSING LINE", `${num(perf.overall.avgClv) >= 0 ? "+" : ""}${num(perf.overall.avgClv).toFixed(2)}%`],
+                ].map(([k, val]) => (
+                  <div key={k}>
+                    <p className="label-caps" style={{ fontSize: 8 }}>{k}</p>
+                    <p className="text-lg font-bold tabular-nums">{val}</p>
+                  </div>
+                ))}
+                {curve.length > 2 && <Sparkline points={curve} width={140} height={36} color="#34d399" baseline={0} />}
+              </div>
             </div>
           )}
         </div>
