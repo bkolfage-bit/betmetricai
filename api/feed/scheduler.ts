@@ -40,6 +40,11 @@ const SWEEP_INTERVAL_MS = 15 * 60 * 1000; // re-price every open pick
 const PROPS_INTERVAL_MS = 6 * 60 * 60 * 1000; // NHL props pull: 4x/day (paid)
 const PROPS_GRADE_INTERVAL_MS = 60 * 60 * 1000; // grade settled props hourly
 const DISCOVERY_INTERVAL_MS = 6 * 60 * 60 * 1000; // full-sport sweep: finds NEW events
+const STUCK_CHECK_INTERVAL_MS = 30 * 60 * 1000; // force-resync "live" events past max duration
+const MAX_GAME_MINUTES: Record<string, number> = {
+  NFL: 330, NCAAF: 330, NBA: 240, NCAAB: 210, MLB: 360, NHL: 270,
+  SOCCER: 210, TENNIS: 360, UFC: 480, GOLF: 600,
+};
 let lastOutrightsRun = 0;
 let lastScoresRun = 0;
 let lastPmRun = 0;
@@ -49,6 +54,7 @@ let lastSweepRun = 0;
 let lastPropsRun = 0;
 let lastPropsGradeRun = 0;
 let lastDiscoveryRun = 0;
+let lastStuckCheckRun = 0;
 
 let timer: NodeJS.Timeout | null = null;
 let running = false;
@@ -117,6 +123,37 @@ async function tick(): Promise<void> {
         if (n > 0) console.log(`[props] graded ${n} NHL props from boxscores`);
       } catch (e) {
         console.error("[props] grading failed:", e instanceof Error ? e.message : e);
+      }
+    }
+
+    // stuck-game guard (runs in every mode): a "live" event that has been
+    // running longer than any real game can possibly last means a scores
+    // poll was missed (downtime, restart). Force an immediate re-check so a
+    // finished game never sits as LIVE for hours. Free: /scores costs 0.
+    if (now - lastStuckCheckRun >= STUCK_CHECK_INTERVAL_MS) {
+      lastStuckCheckRun = now;
+      try {
+        const stuckDb = getDb();
+        const { sports } = await import("@db/schema");
+        const sportRows = await stuckDb.select().from(sports);
+        const codeOf = new Map(sportRows.map((s) => [s.id, s.code]));
+        const liveRows = await stuckDb
+          .select({ id: events.id, startTime: events.startTime, sportId: events.sportId })
+          .from(events)
+          .where(and(eq(events.provider, "THE_ODDS_API"), eq(events.status, "live")));
+        const stuckCodes = new Set<string>();
+        for (const ev of liveRows) {
+          const code = codeOf.get(ev.sportId);
+          if (!code) continue;
+          const maxMin = MAX_GAME_MINUTES[code] ?? 360;
+          if (now - ev.startTime.getTime() > maxMin * 60_000) stuckCodes.add(code);
+        }
+        for (const code of stuckCodes) {
+          const r = await syncScores(code);
+          console.log(`[stuck] ${code}: forced resync — ${r.updated} updated, ${r.finals} final, ${r.graded} graded`);
+        }
+      } catch (e) {
+        console.error("[stuck] check failed:", e instanceof Error ? e.message : e);
       }
     }
 
