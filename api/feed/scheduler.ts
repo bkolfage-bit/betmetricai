@@ -34,6 +34,7 @@ const HORIZON_MS = FORECAST_HORIZON_DAYS * 24 * 60 * 60 * 1000;
 const OUTRIGHTS_INTERVAL_MS = 24 * 60 * 60 * 1000; // futures move slowly
 const SCORES_INTERVAL_MS = 5 * 60 * 1000; // /scores: 1 credit per sport-key
 const PM_INTERVAL_MS = 10 * 60 * 1000; // prediction markets: free public APIs
+const PM_BACKOFF_MAX_MS = 6 * 60 * 60 * 1000; // cap the unreachable-backoff at 6h
 const V2_INTERVAL_MS = 24 * 60 * 60 * 1000; // v2 model re-train/validate daily
 const HEALTH_INTERVAL_MS = 30 * 60 * 1000; // recompute real model health
 const SWEEP_INTERVAL_MS = 15 * 60 * 1000; // re-price every open pick
@@ -48,6 +49,7 @@ const MAX_GAME_MINUTES: Record<string, number> = {
 let lastOutrightsRun = 0;
 let lastScoresRun = 0;
 let lastPmRun = 0;
+let pmFailStreak = 0; // consecutive runs where BOTH venues were unreachable
 let lastV2Run = 0;
 let lastHealthRun = 0;
 let lastSweepRun = 0;
@@ -270,20 +272,39 @@ async function tick(): Promise<void> {
     }
 
     // prediction-market intelligence pass: free public APIs (no quota cost),
-    // every 10 min, isolated from the odds pipeline
-    if (now - lastPmRun >= PM_INTERVAL_MS) {
+    // every 10 min, isolated from the odds pipeline. Circuit breaker: when
+    // BOTH venues are unreachable (e.g. sandbox egress allowlist blocks
+    // kalshi.com / polymarket.com), back off exponentially instead of logging
+    // the same timeout every 10 minutes — and recover automatically the
+    // moment access is restored.
+    const pmBackoffMs = Math.min(
+      PM_BACKOFF_MAX_MS,
+      PM_INTERVAL_MS * Math.pow(2, Math.max(0, pmFailStreak - 1)),
+    );
+    if (now - lastPmRun >= (pmFailStreak >= 2 ? pmBackoffMs : PM_INTERVAL_MS)) {
       lastPmRun = now;
       const pm = await syncPredictionMarkets().catch((e) => {
         console.error("[pm] sync crashed:", e instanceof Error ? e.message : e);
         return null;
       });
       if (pm) {
-        console.log(
-          `[pm] kalshi ${pm.kalshi.events}ev/${pm.kalshi.matched}matched · polymarket ${pm.polymarket.events}ev/${pm.polymarket.matched}matched · history +${pm.historySeeded} · closed ${pm.closed}` +
-            (pm.kalshi.errors.length || pm.polymarket.errors.length
-              ? ` ERRORS: ${[...pm.kalshi.errors, ...pm.polymarket.errors].join("; ").slice(0, 300)}`
-              : ""),
-        );
+        const kalshiDead = pm.kalshi.events === 0 && pm.kalshi.errors.length > 0;
+        const polyDead = pm.polymarket.events === 0 && pm.polymarket.errors.length > 0;
+        const bothDead = kalshiDead && polyDead;
+        pmFailStreak = bothDead ? pmFailStreak + 1 : 0;
+        if (bothDead) {
+          // single concise line per backoff step, not a stack of errors
+          console.log(
+            `[pm] venues unreachable (kalshi+polymarket) — backing off ${Math.round(pmBackoffMs / 60000)}min (streak ${pmFailStreak})`,
+          );
+        } else {
+          console.log(
+            `[pm] kalshi ${pm.kalshi.events}ev/${pm.kalshi.matched}matched · polymarket ${pm.polymarket.events}ev/${pm.polymarket.matched}matched · history +${pm.historySeeded} · closed ${pm.closed}` +
+              (pm.kalshi.errors.length || pm.polymarket.errors.length
+                ? ` ERRORS: ${[...pm.kalshi.errors, ...pm.polymarket.errors].join("; ").slice(0, 300)}`
+                : ""),
+          );
+        }
       }
     }
 
