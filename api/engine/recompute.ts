@@ -24,6 +24,11 @@ import { statusForScore } from "../lib/edge";
 import { getThresholds } from "../lib/config";
 import { marketProbability, type StandardPredictionLike } from "./markets";
 import { aiEdgeScoreEx, getEdgeWeights } from "./edge-score";
+import {
+  blendPmIntoProbability,
+  pmConfidenceFactor,
+  predictionMarketSignal,
+} from "./pm-signal";
 import { SPORT_MODELS } from "../models";
 import {
   consensusFairProb,
@@ -313,10 +318,23 @@ export async function computePickVersion(
   );
   const anchoredProb = shrinkTowardMarket(calibratedProb, consensus, market, anchorCfg, sport.code);
 
+  // 2b. prediction-market signal: blend Kalshi+Polymarket real-money prices
+  //     into the probability (liquidity-gated, capped) and read their
+  //     agreement with the books as a confidence modifier. Absent when no
+  //     liquid matched PM market exists — never fabricated.
+  const pmSignal = await predictionMarketSignal(
+    pick.eventId,
+    market,
+    pick.selection,
+    consensus?.prob ?? null,
+  );
+  const workingProb = blendPmIntoProbability(anchoredProb, pmSignal);
+  const pmConfFactor = pmConfidenceFactor(pmSignal);
+
   // edge/EV are computed from the WORKING probability, not the raw model
-  const probEdge = anchoredProb - noVigProb;
-  const evPerUnit = expectedValue(anchoredProb, best.odds);
-  const kelly = quarterKelly(anchoredProb, best.odds);
+  const probEdge = workingProb - noVigProb;
+  const evPerUnit = expectedValue(workingProb, best.odds);
+  const kelly = quarterKelly(workingProb, best.odds);
 
   // line stability from recent snapshots at the best book
   const dbRows = await db
@@ -345,11 +363,16 @@ export async function computePickVersion(
   }
 
   const weights = await getEdgeWeights(sport.code);
+  const adjustedConfidence = Math.min(1, confidence * pmConfFactor);
   const rawScore = aiEdgeScoreEx({
     probEdge,
     ev: evPerUnit,
-    confidence,
-    agreementFrac,
+    confidence: adjustedConfidence,
+    agreementFrac: pmSignal
+      ? // fold PM agreement into the model-agreement term: PM money agreeing
+        // with the model+books raises it, disagreement lowers it
+        Math.min(1, agreementFrac * (0.5 + 0.5 * pmSignal.agreementScore) + 0.25 * pmSignal.agreementScore)
+      : agreementFrac,
     lineStability: stability,
     dataQuality: 0.9,
     weights,
@@ -381,9 +404,9 @@ export async function computePickVersion(
   // moneyline "value cutoff" is priced off the working probability too
   const betUpToValue =
     market === "moneyline"
-      ? anchoredProb <= 0.01 || anchoredProb >= 0.99
+      ? workingProb <= 0.01 || workingProb >= 0.99
         ? null
-        : probToAmerican(anchoredProb)
+        : probToAmerican(workingProb)
       : betUpTo(like, market, pick.selection, best.odds);
 
   return {
@@ -391,7 +414,7 @@ export async function computePickVersion(
     odds: best.odds,
     sportsbookId: best.sportsbookId,
     modelProb,
-    anchoredProb,
+    anchoredProb: workingProb,
     kelly,
     impliedProb: rawImplied,
     noVigProb,
@@ -400,7 +423,7 @@ export async function computePickVersion(
     edgeScore,
     status,
     betUpTo: betUpToValue,
-    confidence,
+    confidence: adjustedConfidence,
     modelAgreement: agreement,
     modelVersion: pred.modelVersion,
     featureVersion: model?.featureVersion ?? "feat-v1",
