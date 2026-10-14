@@ -5,7 +5,11 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 RUN npm ci --include=dev
-RUN npm ls vite && ls -l node_modules/.bin/vite
+RUN npm config get bin-links
+RUN npm root
+RUN ls -la node_modules/vite/bin
+RUN node -e "console.log(require('./node_modules/vite/package.json').bin)"
+RUN npm exec -- vite --version
 
 COPY . .
 RUN npm run build
