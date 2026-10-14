@@ -29,6 +29,7 @@ import {
   pmConfidenceFactor,
   predictionMarketSignal,
 } from "./pm-signal";
+import { getFusionWeightCached } from "./fusion";
 import { SPORT_MODELS } from "../models";
 import {
   consensusFairProb,
@@ -44,8 +45,11 @@ export interface ComputedVersion {
   odds: number;
   sportsbookId: number;
   modelProb: number;
-  /** working probability after calibration + market anchoring */
+  /** working probability after calibration + market anchoring (+ PM blend
+   *  once a sport's forward-tested fusion weight rises above 0) */
   anchoredProb: number;
+  /** pre-PM anchored probability — Model A for the fusion shadow */
+  modelAProb: number;
   /** quarter-Kelly stake guidance (fraction of bankroll) */
   kelly: number;
   impliedProb: number; // raw implied (with vig)
@@ -322,13 +326,23 @@ export async function computePickVersion(
   //     into the probability (liquidity-gated, capped) and read their
   //     agreement with the books as a confidence modifier. Absent when no
   //     liquid matched PM market exists — never fabricated.
-  const pmSignal = await predictionMarketSignal(
-    pick.eventId,
-    market,
-    pick.selection,
-    consensus?.prob ?? null,
-  );
-  const workingProb = blendPmIntoProbability(anchoredProb, pmSignal);
+  //
+  //     V2 governance (spec §98, §180-184): PM influence is capped by the
+  //     FORWARD-TESTED fusion weight for this sport — never the flat 30% the
+  //     config allows. The weight starts at 0 (pure Model A, shadow mode) and
+  //     only rises after ≥100 settled shadow picks show a meaningful Brier
+  //     improvement, so until then this block is inert and live
+  //     recommendations carry zero prediction-market influence.
+  const pmFw = await getFusionWeightCached(sport.code, market);
+  const pmSignal = pmFw.weight > 0
+    ? await predictionMarketSignal(
+        pick.eventId,
+        market,
+        pick.selection,
+        consensus?.prob ?? null,
+      )
+    : null;
+  const workingProb = blendPmIntoProbability(anchoredProb, pmSignal, pmFw.weight);
   const pmConfFactor = pmConfidenceFactor(pmSignal);
 
   // edge/EV are computed from the WORKING probability, not the raw model
@@ -415,6 +429,11 @@ export async function computePickVersion(
     sportsbookId: best.sportsbookId,
     modelProb,
     anchoredProb: workingProb,
+    /** Model A for the fusion shadow: the engine probability BEFORE any
+     *  prediction-market blend. Identical to anchoredProb while the sport's
+     *  learned PM weight is 0; kept separate so Model C never blends PM
+     *  twice once a sport is promoted (V2 §92–93 double-count guard). */
+    modelAProb: anchoredProb,
     kelly,
     impliedProb: rawImplied,
     noVigProb,
@@ -523,6 +542,42 @@ export async function applyPickVersion(
     changeReason: reason,
     ...(opts.createdAt ? { createdAt: opts.createdAt } : {}),
   });
+
+  // Phase 3/5 (PM fusion): record a shadow prediction — Models A/B/C — for
+  // forward-testing. Runs in shadow mode only (never alters the live pick);
+  // fire-and-forget so a PM-layer failure can never block a real pick.
+  {
+    const sportRow = await db
+      .select({ code: sports.code })
+      .from(events)
+      .innerJoin(sports, eq(events.sportId, sports.id))
+      .where(eq(events.id, pick.eventId))
+      .limit(1);
+    const sportCode = sportRow[0]?.code ?? "";
+    if (sportCode) {
+      void (async () => {
+        const { fuseProbabilities, recordFusionShadow } = await import("./fusion");
+        const fusion = await fuseProbabilities({
+          eventId: pick.eventId,
+          sportCode,
+          market: pick.market,
+          selection: pick.selection,
+          probA: computed.modelAProb,
+          modelVersionA: computed.modelVersion,
+        });
+        await recordFusionShadow({
+          pickId,
+          eventId: pick.eventId,
+          sportCode,
+          market: pick.market,
+          selection: pick.selection,
+          fusion,
+          bookProb: computed.noVigProb,
+          modelVersionA: computed.modelVersion,
+        });
+      })().catch((e) => console.error("[fusion] shadow record failed:", e instanceof Error ? e.message : e));
+    }
+  }
 
   if (prev && prev.status !== computed.status) {
     const evRows = await db

@@ -114,9 +114,15 @@ export async function predictionMarketSignal(
  * estimate proportionally to the money behind it without ever overwhelming
  * the sport model. `base` is the model+market-anchored probability.
  */
-export function blendPmIntoProbability(base: number, signal: PmSignal | null): number {
-  if (!signal) return base;
-  const wPm = PM_MAX_WEIGHT * signal.liquidityScore;
+export function blendPmIntoProbability(
+  base: number,
+  signal: PmSignal | null,
+  /** governance cap from the forward-tested fusion learner (V2 §98) —
+   *  PM influence may never exceed the weight Model C has PROVEN. */
+  maxWeight: number = PM_MAX_WEIGHT,
+): number {
+  if (!signal || maxWeight <= 0) return base;
+  const wPm = Math.min(PM_MAX_WEIGHT, maxWeight) * signal.liquidityScore;
   const p = (1 - wPm) * base + wPm * signal.prob;
   return Math.min(0.999, Math.max(0.001, p));
 }

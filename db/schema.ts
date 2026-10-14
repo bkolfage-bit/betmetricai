@@ -674,3 +674,117 @@ export const modelValidation = mysqlTable("model_validation", {
   trainedGames: int("trainedGames").notNull(),
   evaluatedAt: timestamp("evaluatedAt").defaultNow().notNull(),
 });
+
+
+/* ============================================================================
+ * MARKET INTELLIGENCE UPGRADE V2
+ *
+ * Prediction-market (Kalshi + Polymarket) intelligence, sport-specific PM
+ * models, a 3-way fusion engine (A = sports model, B = prediction-market,
+ * C = validated blend), and shadow-mode validation. Append-only and
+ * versioned everywhere — the existing sports models, their weights, grading
+ * history and decision engine are NOT touched.
+ *
+ * Deployment discipline (spec §Phase 3/4/7): the fusion weight starts at
+ * pure Model A (PM weight 0) and only earns influence through forward-tested
+ * evidence recorded in fusion_shadow. Nothing here fabricates a probability
+ * or a validation metric.
+ * ========================================================================== */
+
+/** Per-sport prediction-market model runtime state + enable switch. */
+export const pmSportModels = mysqlTable("pm_sport_models", {
+  id: serial("id").primaryKey(),
+  sportCode: varchar("sportCode", { length: 16 }).notNull().unique(),
+  /** admin toggle: is this sport's PM intelligence active at all */
+  enabled: boolean("enabled").default(true).notNull(),
+  /** does Kalshi/Polymarket actually list markets for this sport */
+  hasCoverage: boolean("hasCoverage").default(false).notNull(),
+  /** current learned PM weight in the fusion (0 = Model A only). Starts 0. */
+  fusionWeight: decimal("fusionWeight", { precision: 5, scale: 4 }).default("0").notNull(),
+  /** lifecycle: collecting -> shadow -> candidate -> live (per sport) */
+  lifecycle: varchar("lifecycle", { length: 16 }).default("collecting").notNull(),
+  /** count of forward-tested settled predictions informing fusionWeight */
+  forwardSample: int("forwardSample").default(0).notNull(),
+  /** JSON: sport-specific learned parameters (movement sensitivity etc.) */
+  params: text("params"),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+/**
+ * Market-intelligence feature snapshot for one matched event+market at a
+ * point in time. Append-only; each row is a full readout of the 11 Phase-1
+ * features plus the detected behavior flags. Never overwritten.
+ */
+export const pmIntelSnapshots = mysqlTable("pm_intel_snapshots", {
+  id: serial("id").primaryKey(),
+  eventId: bigint("eventId", { mode: "number", unsigned: true }).notNull(),
+  sportCode: varchar("sportCode", { length: 16 }).notNull(),
+  market: varchar("market", { length: 16 }).notNull(), // moneyline | spread | total
+  selection: varchar("selection", { length: 16 }).notNull(),
+  /** the 11 Phase-1 features + behavior flags, as JSON (see pm-intel.ts) */
+  features: text("features").notNull(),
+  capturedAt: timestamp("capturedAt").defaultNow().notNull(),
+}, (t) => [unique("uq_pm_intel").on(t.eventId, t.market, t.selection, t.capturedAt)]);
+
+/**
+ * Shadow-mode prediction record: for each live pick, what Model A, Model B
+ * and Model C each said, with full inputs and version stamps. This is the
+ * forward-testing evidence base — graded later against real outcomes.
+ * Append-only; a row is created at pick time and `result`/`brierA/B/C`
+ * filled only when the game settles (no look-ahead).
+ */
+export const fusionShadow = mysqlTable("fusion_shadow", {
+  id: serial("id").primaryKey(),
+  pickId: bigint("pickId", { mode: "number", unsigned: true }).notNull(),
+  eventId: bigint("eventId", { mode: "number", unsigned: true }).notNull(),
+  sportCode: varchar("sportCode", { length: 16 }).notNull(),
+  market: varchar("market", { length: 16 }).notNull(),
+  selection: varchar("selection", { length: 16 }).notNull(),
+  /** Model A: existing sports model working probability */
+  probA: decimal("probA", { precision: 8, scale: 6 }).notNull(),
+  /** Model B: prediction-market probability (null when no PM coverage) */
+  probB: decimal("probB", { precision: 8, scale: 6 }),
+  /** Model C: fused probability with the weight in effect at pick time */
+  probC: decimal("probC", { precision: 8, scale: 6 }).notNull(),
+  /** the PM weight actually used for probC (0 = pure Model A) */
+  weightUsed: decimal("weightUsed", { precision: 5, scale: 4 }).notNull(),
+  /** sportsbook no-vig consensus at pick time (the price we bet against) */
+  bookProb: decimal("bookProb", { precision: 8, scale: 6 }),
+  /** PM liquidity/volume + data-quality at pick time */
+  pmLiquidity: decimal("pmLiquidity", { precision: 16, scale: 2 }),
+  dataQuality: decimal("dataQuality", { precision: 5, scale: 4 }),
+  /** model versions for reproducibility */
+  modelVersionA: varchar("modelVersionA", { length: 32 }),
+  modelVersionB: varchar("modelVersionB", { length: 32 }),
+  /** filled at settlement: 1 = selection won, 0 = lost (push excluded) */
+  outcome: int("outcome"),
+  brierA: decimal("brierA", { precision: 9, scale: 6 }),
+  brierB: decimal("brierB", { precision: 9, scale: 6 }),
+  brierC: decimal("brierC", { precision: 9, scale: 6 }),
+  placedAt: timestamp("placedAt").defaultNow().notNull(),
+  settledAt: timestamp("settledAt"),
+}, (t) => [unique("uq_fusion_shadow").on(t.pickId)]);
+
+/**
+ * Fusion weight change audit — every time a sport's PM weight moves, why,
+ * and the evidence behind it. Append-only; weights never change silently.
+ */
+export const fusionWeightLog = mysqlTable("fusion_weight_log", {
+  id: serial("id").primaryKey(),
+  sportCode: varchar("sportCode", { length: 16 }).notNull(),
+  market: varchar("market", { length: 16 }), // null = sport-wide
+  prevWeight: decimal("prevWeight", { precision: 5, scale: 4 }).notNull(),
+  nextWeight: decimal("nextWeight", { precision: 5, scale: 4 }).notNull(),
+  /** evidence snapshot: forward sample, Brier A vs C, decision rationale */
+  evidence: text("evidence").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+/** Admin config for the intelligence layer (per-sport enable already on
+ *  pm_sport_models; this holds global toggles + promotion thresholds). */
+export const pmIntelConfig = mysqlTable("pm_intel_config", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 64 }).notNull().unique(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});

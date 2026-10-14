@@ -342,5 +342,16 @@ export async function gradeEventPicks(eventId: number): Promise<number> {
     });
     graded++;
   }
+
+  // Phase 4: settle any fusion shadow rows for this event now that its
+  // results exist. Same source of truth (pick_history), no look-ahead.
+  if (graded > 0) {
+    try {
+      const { settleFusionShadow } = await import("../engine/fusion-validate");
+      await settleFusionShadow();
+    } catch (e) {
+      console.error("[fusion] settle failed:", e instanceof Error ? e.message : e);
+    }
+  }
   return graded;
 }

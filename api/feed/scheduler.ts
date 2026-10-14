@@ -330,6 +330,19 @@ async function tick(): Promise<void> {
       } catch (e) {
         console.error("[calibration] fit refresh failed:", e instanceof Error ? e.message : e);
       }
+      // fusion weight learning (daily): re-derive each sport's PM weight from
+      // settled forward-tested shadow rows. Weights only move on meaningful
+      // out-of-sample improvement, and every change is logged with evidence.
+      try {
+        const { learnFusionWeight } = await import("../engine/fusion");
+        const { SPORT_ORDER } = await import("../models");
+        for (const code of SPORT_ORDER) {
+          const w = await learnFusionWeight(code);
+          if (w !== null) console.log(`[fusion] ${code} PM weight → ${w.toFixed(3)}`);
+        }
+      } catch (e) {
+        console.error("[fusion] weight learning failed:", e instanceof Error ? e.message : e);
+      }
     }
 
     // championship / futures exception: outrights sync daily, regardless of

@@ -11,6 +11,7 @@ import { feedRouter } from "./routers/feed";
 import { pmarketsRouter } from "./routers/pmarkets";
 import { savedRouter } from "./routers/saved";
 import { testimonialsRouter } from "./routers/testimonials";
+import { marketIntelRouter } from "./routers/market-intel";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -28,6 +29,7 @@ export const appRouter = createRouter({
   pmarkets: pmarketsRouter,
   saved: savedRouter,
   testimonials: testimonialsRouter,
+  marketIntel: marketIntelRouter,
 });
 
 export type AppRouter = typeof appRouter;

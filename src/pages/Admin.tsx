@@ -7,6 +7,7 @@ import { timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Shield } from "lucide-react";
 import { UpgradeReport } from "@/pages/Sports";
+import { MarketIntelPanel } from "@/components/MarketIntelPanel";
 
 type EdgeWeightDraft = {
   probEdge: number;
@@ -548,6 +549,8 @@ export default function Admin() {
       />
 
       <FeedDashboard />
+
+      <MarketIntelPanel />
 
       {/* health cards */}
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-border bg-border font-mono2 sm:grid-cols-4">
