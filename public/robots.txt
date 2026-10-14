@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /account
+Disallow: /tracker
+Disallow: /saved
+Disallow: /sports
+Disallow: /api/
+
+Sitemap: https://betmetric.kimi.pro/sitemap.xml

@@ -1,0 +1,192 @@
+import { useMemo, useState } from "react";
+import { Link } from "react-router";
+import { Lock, Sparkles } from "lucide-react";
+import { trpc } from "@/providers/trpc";
+import { EmptyState, SectionHead, StatusBadge } from "@/components/bits";
+import { Seo } from "@/components/Seo";
+import { ProTeaser } from "@/components/ProTeaser";
+import { useSportFilter } from "@/providers/sport-filter";
+import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
+import { fmtLine, fmtOdds, fmtTime, num, pct, signedPct, timeAgo } from "@/lib/format";
+
+export default function PlusEV() {
+  const { sport } = useSportFilter();
+  const { user } = useAuth();
+  const isPro = user?.plan === "pro" || user?.role === "admin";
+  const { data } = trpc.picks.list.useQuery(sport ? { sport } : undefined, { refetchInterval: 15000 });
+  const [minEv, setMinEv] = useState(0);
+
+  const rows = useMemo(() => {
+    return (data?.picks ?? [])
+      .filter((p) => p.version && num(p.version.ev) > minEv / 100)
+      .sort((a, b) => num(b.version!.ev) - num(a.version!.ev));
+  }, [data, minEv]);
+
+  return (
+    <div className="flex flex-col gap-6">
+    <Seo title="+EV Betting Opportunities — AI Value Screen" description="Live +EV betting opportunities: our AI compares predicted outcomes against real-time sportsbook odds to surface potentially undervalued bets, ranked by expected value." path="/ev" />
+
+      <SectionHead
+        title="+EV opportunities"
+        sub="Our proprietary AI analyzes thousands of data points and compares predicted outcomes against real-time sportsbook odds to uncover potentially undervalued bets. Each +EV opportunity is ranked by its estimated long-term value, helping you find where the numbers suggest an edge over Vegas."
+        right={
+          <label className="flex items-center gap-2 font-mono2 text-[10px] text-muted-foreground">
+            MIN EV
+            <select
+              value={minEv}
+              onChange={(e) => setMinEv(Number(e.target.value))}
+              className="min-h-[36px] rounded-sm border border-border bg-card px-2 font-mono2 text-xs text-foreground"
+            >
+              {[0, 2, 4, 6, 8].map((v) => (
+                <option key={v} value={v}>{v}%</option>
+              ))}
+            </select>
+          </label>
+        }
+      />
+
+      {isPro ? (
+      <div className="panel overflow-x-auto rounded-sm">
+        <table className="w-full min-w-[760px] border-collapse font-mono2 text-xs">
+          <thead>
+            <tr className="border-b border-border text-left">
+              {["SPORT", "EVENT", "DATE", "SELECTION", "BOOK", "PRICE", "OUR ODDS", "BOOK'S ODDS", "EDGE", "EV/UNIT", "AI EDGE", "STATUS", "UPDATED"].map((h) => (
+                <th key={h} className="label-caps px-3 py-2.5 font-normal">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((p) => {
+              const v = p.version!;
+              return (
+                <tr key={p.pick.id} className="border-b border-border/60 transition-colors last:border-0 hover:bg-secondary/50">
+                  <td className="px-3 py-2.5 font-bold text-muted-foreground">{p.sportCode}</td>
+                  <td className="px-3 py-2.5 whitespace-nowrap">
+                    {p.away.abbr} @ {p.home.abbr}
+                    {p.event.status === "live" && <span className="ml-2 text-live">●LIVE</span>}
+                  </td>
+                  <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">
+                    {fmtTime(p.event.startTime)}
+                  </td>
+                  <td className="px-3 py-2.5 font-bold whitespace-nowrap">
+                    {p.pick.market === "moneyline"
+                      ? `${p.pick.selection === "home" ? p.home.abbr : p.pick.selection === "draw" ? "Draw" : p.away.abbr} ML`
+                      : p.pick.market === "spread"
+                        ? `${p.pick.selection === "home" ? p.home.abbr : p.away.abbr} ${fmtLine(v.line)}`
+                        : `${p.pick.selection === "over" ? "Over" : "Under"} ${v.line}`}
+                  </td>
+                  <td className="px-3 py-2.5 text-muted-foreground">{p.book?.name}</td>
+                  <td className="px-3 py-2.5 tabular-nums">{fmtOdds(v.odds)}</td>
+                  <td className="px-3 py-2.5 tabular-nums font-bold">{pct(v.modelProb)}</td>
+                  <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{pct(v.impliedProb)}</td>
+                  <td className={cn("px-3 py-2.5 tabular-nums", num(v.probEdge) >= 0 ? "text-pos" : "text-neg")}>{signedPct(v.probEdge)}</td>
+                  <td className={cn("px-3 py-2.5 tabular-nums font-bold", num(v.ev) >= 0 ? "text-pos" : "text-neg")}>{signedPct(v.ev)}</td>
+                  <td className="px-3 py-2.5 tabular-nums font-bold text-primary">{v.edgeScore}</td>
+                  <td className="px-3 py-2.5"><StatusBadge status={v.status} /></td>
+                  <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">{timeAgo(v.createdAt)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {rows.length === 0 && (
+          <div className="p-6">
+            <EmptyState
+              title="No +EV positions at this threshold"
+              hint="The screen only lists prices the model beats. When the market moves, new windows open automatically."
+            />
+          </div>
+        )}
+      </div>
+      ) : (
+        <ProTeaser
+          title="+EV opportunities are part of Pro"
+          sub="This live board lists every price our AI beats right now — selection, book, our win probability vs the book's, edge and expected profit. Upgrade to see it unblurred."
+        >
+          <div className="panel overflow-x-auto rounded-sm">
+            <table className="w-full min-w-[760px] border-collapse font-mono2 text-xs">
+              <thead>
+                <tr className="border-b border-border text-left">
+                  {["SPORT", "EVENT", "SELECTION", "BOOK", "PRICE", "OUR ODDS", "BOOK'S ODDS", "EDGE", "EV/UNIT", "AI EDGE", "STATUS"].map((h) => (
+                    <th key={h} className="label-caps px-3 py-2.5 font-normal">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((p) => {
+                  const v = p.version!;
+                  return (
+                    <tr key={p.pick.id} className="border-b border-border/60 last:border-0">
+                      <td className="px-3 py-2.5 font-bold text-muted-foreground">{p.sportCode}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">{p.away.abbr} @ {p.home.abbr}</td>
+                      <td className="px-3 py-2.5 font-bold whitespace-nowrap">
+                        {p.pick.market === "moneyline"
+                          ? `${p.pick.selection === "home" ? p.home.abbr : p.pick.selection === "draw" ? "Draw" : p.away.abbr} ML`
+                          : p.pick.market === "spread"
+                            ? `${p.pick.selection === "home" ? p.home.abbr : p.away.abbr} ${fmtLine(v.line)}`
+                            : `${p.pick.selection === "over" ? "Over" : "Under"} ${v.line}`}
+                      </td>
+                      <td className="px-3 py-2.5 text-muted-foreground">{p.book?.name}</td>
+                      <td className="px-3 py-2.5 tabular-nums">{fmtOdds(v.odds)}</td>
+                      <td className="px-3 py-2.5 tabular-nums font-bold">{pct(v.modelProb)}</td>
+                      <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{pct(v.impliedProb)}</td>
+                      <td className="px-3 py-2.5 tabular-nums text-pos">{signedPct(v.probEdge)}</td>
+                      <td className="px-3 py-2.5 tabular-nums font-bold text-pos">{signedPct(v.ev)}</td>
+                      <td className="px-3 py-2.5 tabular-nums font-bold text-primary">{v.edgeScore}</td>
+                      <td className="px-3 py-2.5"><StatusBadge status={v.status} /></td>
+                    </tr>
+                  );
+                })}
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={11} className="px-3 py-8 text-center text-muted-foreground">
+                      Loading the live board…
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </ProTeaser>
+      )}
+
+      <div className="flex flex-col gap-2">
+        <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
+          * EV is expected value per 1 unit staked, computed from the model probability
+          and the best available price after removing the vig. +EV does not mean the
+          bet will win — it means the price is in your favor over the long run.
+        </p>
+        <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
+          * What is Vig? Vig is the sportsbook's built-in profit margin. Our AI removes
+          this margin when analyzing market probabilities, helping reveal the true odds
+          behind the sportsbook's pricing.
+        </p>
+        <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
+          * How to read the columns: OUR ODDS is our AI's estimated win probability;
+          BOOK'S ODDS is the win probability implied by the sportsbook's price. When
+          ours is higher, the difference is your EDGE — and EV/UNIT is the average
+          profit per dollar staked if our numbers are right.
+        </p>
+      </div>
+
+      {isPro && (data?.lockedCount ?? 0) > 0 && (
+        <Link
+          to="/premium"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-[#fbbf24]/40 bg-warn-dim px-5 py-4 transition-colors hover:border-[#fbbf24]/70"
+        >
+          <div className="flex items-center gap-3">
+            <Lock className="h-4 w-4 text-warn" />
+            <p className="text-xs text-muted-foreground">
+              <span className="font-bold text-foreground">{data!.lockedCount} more +EV position{data!.lockedCount === 1 ? "" : "s"}</span>{" "}
+              locked on the FREE plan — including every AI Edge above 90.
+            </p>
+          </div>
+          <span className="flex items-center gap-1.5 font-mono2 text-[10px] font-bold tracking-[0.14em] text-warn">
+            <Sparkles className="h-3.5 w-3.5" /> UNLOCK WITH PRO
+          </span>
+        </Link>
+      )}
+    </div>
+  );
+}

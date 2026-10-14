@@ -1,0 +1,151 @@
+import { useMemo, useState } from "react";
+import { Link } from "react-router";
+import { trpc } from "@/providers/trpc";
+import { PickCard } from "@/components/PickCard";
+import { Seo } from "@/components/Seo";
+import { useSportFilter } from "@/providers/sport-filter";
+import { useAuth } from "@/hooks/useAuth";
+import { EmptyState, SectionHead } from "@/components/bits";
+import { cn } from "@/lib/utils";
+import { STATUS_META, type PickStatus } from "@/lib/format";
+import { Lock, Sparkles } from "lucide-react";
+
+const FILTERS: Array<{ key: PickStatus | "ALL"; label: string }> = [
+  { key: "ALL", label: "ALL" },
+  { key: "STRONG_BET", label: "STRONG BET" },
+  { key: "BET", label: "BET" },
+  { key: "WATCH", label: "WATCH" },
+  { key: "HOLD", label: "HOLD" },
+  { key: "PASS", label: "PASS" },
+];
+
+export default function Picks() {
+  const { sport } = useSportFilter();
+  const { user } = useAuth();
+  const isPro = user?.plan === "pro" || user?.role === "admin";
+  const { data, isLoading } = trpc.picks.list.useQuery(
+    sport ? { sport } : undefined,
+    { refetchInterval: 15000 },
+  );
+  const [filter, setFilter] = useState<PickStatus | "ALL">("ALL");
+
+  const rows = useMemo(() => {
+    const all = data?.picks ?? [];
+    if (filter === "ALL") return all;
+    return all.filter((p) => p.version?.status === filter);
+  }, [data, filter]);
+
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { ALL: (data?.picks ?? []).length };
+    for (const p of data?.picks ?? []) {
+      if (p.version) c[p.version.status] = (c[p.version.status] ?? 0) + 1;
+    }
+    return c;
+  }, [data]);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Seo title="Today's AI Picks — Ranked by Edge Score" description="Today's AI sports picks ranked by Edge Score — every pick shows our AI's win probability vs the sportsbook's price, the best available odds, and a full version history." path="/picks" />
+
+      <SectionHead
+        title="AI Picks"
+        sub="Our AI's best positions right now, ranked by how strongly the numbers disagree with the sportsbook's price. Every pick updates as odds move — and its full history stays visible."
+      />
+
+      {!isPro && (
+        <Link
+          to="/premium"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-[#fbbf24]/40 bg-warn-dim px-5 py-4 transition-colors hover:border-[#fbbf24]/70"
+        >
+          <div className="flex items-start gap-3">
+            <Lock className="mt-0.5 h-4 w-4 shrink-0 text-warn" />
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              <span className="font-bold text-foreground">You're seeing the free board — not the full one.</span>{" "}
+              What shows up here is a sample: two picks per sport, and none of the positions our AI rates
+              highest. The picks with the strongest edge — the ones we'd actually put our name on — are
+              only on the Pro board.
+            </p>
+          </div>
+          <span className="flex items-center gap-1.5 font-mono2 text-[10px] font-bold tracking-[0.14em] text-warn">
+            <Sparkles className="h-3.5 w-3.5" /> SEE EVERYTHING WITH PRO
+          </span>
+        </Link>
+      )}
+
+      {/* status filter rail */}
+      <div className="flex flex-wrap gap-1.5">
+        {FILTERS.map((f) => {
+          const active = filter === f.key;
+          const meta = f.key !== "ALL" ? STATUS_META[f.key as PickStatus] : null;
+          return (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={cn(
+                "flex min-h-[44px] items-center gap-2 rounded-sm border px-3 font-mono2 text-[10px] font-bold tracking-[0.14em] transition-colors",
+                active
+                  ? "border-primary bg-live-dim text-primary"
+                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+              )}
+            >
+              {meta?.dot && <span className={cn("led", meta.dot)} />}
+              {f.label}
+              <span className="text-muted-foreground/70">{counts[f.key] ?? 0}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-col gap-3">
+        {isLoading && (
+          <div className="panel animate-pulse rounded-sm p-8 text-center font-mono2 text-xs text-muted-foreground">
+            LOADING BOARD…
+          </div>
+        )}
+        {!isLoading && rows.length === 0 && (
+          <EmptyState
+            title="No picks in this bucket"
+            hint="We only publish a pick when our AI's probability disagrees with the sportsbook's price enough to matter. Check another status filter, or check back as odds move."
+          />
+        )}
+        {rows.map((row) => (
+          <PickCard key={row.pick.id} row={row} />
+        ))}
+      </div>
+
+      {!isLoading && (data?.lockedCount ?? 0) > 0 && (
+        <Link
+          to="/premium"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-[#fbbf24]/40 bg-warn-dim px-5 py-4 transition-colors hover:border-[#fbbf24]/70"
+        >
+          <div className="flex items-center gap-3">
+            <Lock className="h-4 w-4 text-warn" />
+            <p className="text-xs text-muted-foreground">
+              <span className="font-bold text-foreground">{data!.lockedCount} more pick{data!.lockedCount === 1 ? "" : "s"}</span>{" "}
+              hidden on the FREE plan — including every AI Edge above 90.
+            </p>
+          </div>
+          <span className="flex items-center gap-1.5 font-mono2 text-[10px] font-bold tracking-[0.14em] text-warn">
+            <Sparkles className="h-3.5 w-3.5" /> UNLOCK WITH PRO
+          </span>
+        </Link>
+      )}
+
+      <div className="flex flex-col gap-2">
+        <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
+          * A 62% win probability is a prediction — not automatically a good bet.
+          What matters is how that probability compares to the sportsbook's price.
+          Our AI Edge Score (0–100) measures exactly that gap: STRONG BET ≥ 90 ·
+          BET ≥ 80 · WATCH ≥ 70 · HOLD ≥ 60 · PASS &lt; 60. EV (expected value)
+          is the average profit per dollar staked if our probability is right —
+          positive EV means the numbers favor you over the long run.
+        </p>
+        <p className="font-mono2 text-[10px] leading-relaxed text-muted-foreground">
+          * Every pick is versioned: when odds move, the engine re-evaluates and
+          stores a new version — so you can always see what we said, when, and at
+          what price. Nothing is ever edited after the fact.
+        </p>
+      </div>
+    </div>
+  );
+}

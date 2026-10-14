@@ -1,0 +1,56 @@
+import { Routes, Route } from "react-router";
+import Layout from "./components/Layout";
+import { ScrollToTop } from "./components/ScrollToTop";
+import Home from "./pages/Home";
+import Picks from "./pages/Picks";
+import Live from "./pages/Live";
+import PlusEV from "./pages/PlusEV";
+import Props from "./pages/Props";
+import Parlays from "./pages/Parlays";
+import LineMovement from "./pages/LineMovement";
+import Sports from "./pages/Sports";
+import ModelDetail from "./pages/ModelDetail";
+import Assistant from "./pages/Assistant";
+import Tracker from "./pages/Tracker";
+import Saved from "./pages/Saved";
+import Performance from "./pages/Performance";
+import PredictionMarkets from "./pages/PredictionMarkets";
+import Premium from "./pages/Premium";
+import Account from "./pages/Account";
+import Admin from "./pages/Admin";
+import Login from "./pages/Login";
+import About from "./pages/About";
+import NotFound from "./pages/NotFound";
+import AdminGate from "./components/AdminGate";
+
+export default function App() {
+  return (
+    <>
+      <ScrollToTop />
+      <Routes>
+      <Route element={<Layout />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/picks" element={<Picks />} />
+        <Route path="/live" element={<Live />} />
+        <Route path="/ev" element={<PlusEV />} />
+        <Route path="/props" element={<Props />} />
+        <Route path="/parlays" element={<Parlays />} />
+        <Route path="/line-movement" element={<LineMovement />} />
+        <Route path="/sports" element={<AdminGate><Sports /></AdminGate>} />
+        <Route path="/sports/:modelId" element={<AdminGate><ModelDetail /></AdminGate>} />
+        <Route path="/assistant" element={<Assistant />} />
+        <Route path="/tracker" element={<Tracker />} />
+        <Route path="/saved" element={<Saved />} />
+        <Route path="/performance" element={<Performance />} />
+        <Route path="/markets" element={<PredictionMarkets />} />
+        <Route path="/premium" element={<Premium />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/account" element={<Account />} />
+        <Route path="/admin" element={<Admin />} />
+      </Route>
+      <Route path="/login" element={<Login />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
+  );
+}
