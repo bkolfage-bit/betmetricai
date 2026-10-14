@@ -13,7 +13,9 @@ export const env = {
   appSecret: required("APP_SECRET"),
   isProduction: process.env.NODE_ENV === "production",
   databaseUrl: required("DATABASE_URL"),
-  kimiAuthUrl: required("KIMI_AUTH_URL"),
-  kimiOpenUrl: required("KIMI_OPEN_URL"),
+  // Optional off-Kimi: email/password auth (api/auth-router.ts) is the login
+  // path; the Kimi OAuth callback simply stays dormant when these are unset.
+  kimiAuthUrl: process.env.KIMI_AUTH_URL ?? "",
+  kimiOpenUrl: process.env.KIMI_OPEN_URL ?? "",
   ownerUnionId: process.env.OWNER_UNION_ID ?? "",
 };

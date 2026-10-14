@@ -128,12 +128,14 @@ interface GatewayConfig {
 }
 
 function config(): GatewayConfig {
-  const baseUrl = readEnv("KIMI_AGENTGW_BASE_URL");
-  const apiKey = readEnv("KIMI_AGENTGW_API_KEY");
+  // Kimi-hosted gateway first; AI_BASE_URL/AI_API_KEY are the generic
+  // OpenAI-compatible fallback for off-Kimi hosting (e.g. Railway + OpenAI).
+  const baseUrl = readEnv("KIMI_AGENTGW_BASE_URL") ?? readEnv("AI_BASE_URL");
+  const apiKey = readEnv("KIMI_AGENTGW_API_KEY") ?? readEnv("AI_API_KEY");
   if (!baseUrl || !apiKey) {
     throw new AiMisconfigured(
-      "KIMI_AGENTGW_BASE_URL / KIMI_AGENTGW_API_KEY 未注入：站点可能尚未供给。" +
-        "先确认 .env 里有这两个变量；没有则让用户发布（或重新打开）一次站点后重试。",
+      "No AI gateway configured: set KIMI_AGENTGW_BASE_URL/KIMI_AGENTGW_API_KEY " +
+        "(Kimi hosting) or AI_BASE_URL/AI_API_KEY (any OpenAI-compatible provider).",
     );
   }
   return { baseUrl: baseUrl.replace(/\/+$/, ""), apiKey };
@@ -303,7 +305,11 @@ export async function listModels(): Promise<ModelList> {
     supportsReasoning: m.supports_reasoning as boolean | undefined,
     supportsImageIn: m.supports_image_in as boolean | undefined,
   }));
-  const defaultModelId = body.default_model_id ?? models[0]?.id ?? "";
+  // AI_MODEL pins the model on generic providers (OpenAI's /models has no
+  // default_model_id and its first entry is arbitrary). Kimi gateway keeps
+  // its own default_model_id precedence — never hardcode a model id here.
+  const defaultModelId =
+    readEnv("AI_MODEL") ?? body.default_model_id ?? models[0]?.id ?? "";
   if (!defaultModelId) throw new AiUnavailable("网关未下发可用模型");
   return { models, defaultModelId };
 }

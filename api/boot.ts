@@ -15,6 +15,21 @@ import { feedStreamHandler } from "./feed/stream";
 const app = new Hono<{ Bindings: HttpBindings }>();
 
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
+// Liveness/readiness probe for hosting platforms and uptime monitors.
+// 200 with db:true = fully healthy; 503 = process up but database unreachable.
+app.get("/api/health", async (c) => {
+  let db = false;
+  try {
+    const { getDb } = await import("./queries/connection");
+    const { sql } = await import("drizzle-orm");
+    await getDb().execute(sql`select 1`);
+    db = true;
+  } catch { /* db down — report, don't crash */ }
+  return c.json(
+    { ok: true, db, uptime: Math.round(process.uptime()), ts: new Date().toISOString() },
+    db ? 200 : 503,
+  );
+});
 app.get(Paths.oauthCallback, createOAuthCallbackHandler());
 app.post("/api/ai/chat", async (c) => handleAssistantChat(c.req.raw));
 // realtime odds-feed status (SSE)

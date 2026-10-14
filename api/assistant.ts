@@ -18,18 +18,31 @@ import {
 import { desc, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { fmtLine, fmtOdds } from "./lib/edge";
-import { classifyAiError, listModels } from "./lib/ai-client";
+import { AiMisconfigured, classifyAiError, listModels } from "./lib/ai-client";
 
 const homeTeams = alias(teams, "home_teams");
 const awayTeams = alias(teams, "away_teams");
 
-const kimiGw = createOpenAICompatible({
-  name: "kimi-gw",
-  baseURL: process.env.KIMI_AGENTGW_BASE_URL!,
-  apiKey: process.env.KIMI_AGENTGW_API_KEY!,
-  includeUsage: true,
-  supportsStructuredOutputs: true,
-});
+// Lazy: building the client at module scope would crash server boot when the
+// AI gateway env vars are absent (e.g. before AI_BASE_URL/AI_API_KEY are set
+// on off-Kimi hosting). Kimi gateway vars take priority; AI_* are the generic
+// OpenAI-compatible fallback.
+function aiGw() {
+  const baseURL = process.env.KIMI_AGENTGW_BASE_URL ?? process.env.AI_BASE_URL;
+  const apiKey = process.env.KIMI_AGENTGW_API_KEY ?? process.env.AI_API_KEY;
+  if (!baseURL || !apiKey) {
+    throw new AiMisconfigured(
+      "AI assistant not configured: set KIMI_AGENTGW_* or AI_BASE_URL/AI_API_KEY.",
+    );
+  }
+  return createOpenAICompatible({
+    name: "kimi-gw",
+    baseURL,
+    apiKey,
+    includeUsage: true,
+    supportsStructuredOutputs: true,
+  });
+}
 
 const SYSTEM_PROMPT = `You are the intelligence and explanation layer for BetMetricAi, a sports betting analytics platform.
 
@@ -140,7 +153,7 @@ export async function handleAssistantChat(req: Request): Promise<Response> {
     const { defaultModelId } = await listModels();
 
     const result = streamText({
-      model: kimiGw(defaultModelId),
+      model: aiGw()(defaultModelId),
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {
