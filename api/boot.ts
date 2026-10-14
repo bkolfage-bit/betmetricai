@@ -26,7 +26,15 @@ app.get("/api/health", async (c) => {
     db = true;
   } catch { /* db down — report, don't crash */ }
   return c.json(
-    { ok: true, db, uptime: Math.round(process.uptime()), ts: new Date().toISOString() },
+    {
+      ok: true,
+      db,
+      uptime: Math.round(process.uptime()),
+      ts: new Date().toISOString(),
+      // Railway injects RAILWAY_* env vars into every container automatically
+      // (no setup needed) — lets monitors distinguish Railway from Kimi hosting.
+      railway: !!process.env.RAILWAY_ENVIRONMENT,
+    },
     db ? 200 : 503,
   );
 });
