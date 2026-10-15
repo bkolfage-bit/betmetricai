@@ -1,0 +1,36 @@
+name: Deploy to Alibaba ECS
+
+# Auto-deploy on every push to main. Requires GitHub Secrets:
+#   ECS_HOST     — public IP of the ECS instance
+#   ECS_USER     — e.g. root
+#   ECS_SSH_KEY  — private key whose .pub is in the server's authorized_keys
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH (git pull + docker rebuild)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/betmetricai/app
+            git pull origin main
+            docker build -t betmetricai .
+            docker stop betmetricai || true
+            docker rm betmetricai || true
+            docker run -d --name betmetricai --restart always \
+              --env-file .env \
+              --log-opt max-size=50m --log-opt max-file=3 \
+              -p 127.0.0.1:3000:3000 \
+              betmetricai
+            sleep 8
+            curl -sf http://127.0.0.1:3000/api/health
+            docker image prune -f
