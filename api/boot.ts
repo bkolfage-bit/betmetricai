@@ -15,6 +15,21 @@ import { feedStreamHandler } from "./feed/stream";
 const app = new Hono<{ Bindings: HttpBindings }>();
 
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
+
+// Cache policy: the site must always reflect the freshest odds/picks.
+//  - API responses: never stored (live data)
+//  - HTML shell: revalidate every load (it references hashed bundles)
+//  - /assets/*: Vite content-hashed files — safe to cache long-term
+app.use("*", async (c, next) => {
+  await next();
+  if (c.req.path.startsWith("/api/")) {
+    c.header("Cache-Control", "no-store");
+  } else if (c.req.path.startsWith("/assets/")) {
+    c.header("Cache-Control", "public, max-age=31536000, immutable");
+  } else if ((c.req.header("accept") ?? "").includes("text/html") || c.req.path === "/" || c.req.path.endsWith(".html")) {
+    c.header("Cache-Control", "no-cache, must-revalidate");
+  }
+});
 // Liveness/readiness probe for hosting platforms and uptime monitors.
 // 200 with db:true = fully healthy; 503 = process up but database unreachable.
 app.get("/api/health", async (c) => {
