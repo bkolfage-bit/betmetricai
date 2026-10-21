@@ -17,6 +17,7 @@ export default function Performance() {
   }
   const o = data.overall;
   const curve = data.curve.filter((_, i) => i % 2 === 0).map((c) => c.units);
+  const epochLabel = new Date(data.epoch).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
   return (
     <div className="flex flex-col gap-8">
@@ -26,6 +27,18 @@ export default function Performance() {
         title="AI performance — full transparency"
         sub="Every graded pick is auditable. Losing picks are never hidden, records are never restated."
       />
+
+      {/* measurement window notice — the headline numbers track the current
+          model from its go-live date; the complete record sits below */}
+      <div className="rounded-sm border border-primary/30 bg-live-dim/40 px-4 py-3 font-mono2 text-[10px] leading-relaxed tracking-[0.06em] text-muted-foreground">
+        <span className="font-bold text-primary">MEASURING FROM {epochLabel.toUpperCase()}</span>
+        {" "}— the stats and chart on this page track the current model from the day it went live
+        ({data.overall.total} picks graded since). The complete record ({data.allTime.total} picks,{" "}
+        {data.allTime.wins}-{data.allTime.losses}-{data.allTime.pushes},{" "}
+        {data.allTime.units >= 0 ? "+" : ""}{data.allTime.units.toFixed(1)}u all-time) is preserved in
+        full below under All-time record. Nothing is deleted — the older picks simply predate the
+        system being measured.
+      </div>
 
       {/* headline stats */}
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-border bg-border font-mono2 sm:grid-cols-4 lg:grid-cols-8">
@@ -77,15 +90,38 @@ export default function Performance() {
 
       {/* units curve */}
       <section className="panel rounded-sm p-5">
-        <p className="label-caps mb-4">Cumulative units — last 90 days</p>
+        <p className="label-caps mb-4">Cumulative units — current model, since {epochLabel}</p>
         <div className="overflow-x-auto">
           <Sparkline points={curve} width={900} height={180} color="#34d399" baseline={0} />
         </div>
       </section>
 
+      {/* all-time record — unfiltered, pre-change picks included */}
+      <section className="panel rounded-sm p-5">
+        <p className="label-caps mb-1">All-time record — unfiltered</p>
+        <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
+          Every graded pick ever published, including the {data.preEpochCount} picks graded before the
+          current model went live on {epochLabel}. This is the full audit trail — it never resets.
+        </p>
+        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-sm border border-border bg-border font-mono2 sm:grid-cols-5">
+          {[
+            ["PICKS", `${data.allTime.total}`],
+            ["RECORD", `${data.allTime.wins}-${data.allTime.losses}-${data.allTime.pushes}`],
+            ["WIN RATE", pct(data.allTime.winRate)],
+            ["ROI", signedPct(data.allTime.roi)],
+            ["UNITS", `${data.allTime.units >= 0 ? "+" : ""}${data.allTime.units.toFixed(1)}u`],
+          ].map(([k, val]) => (
+            <div key={k} className="bg-card px-4 py-3.5">
+              <p className="label-caps" style={{ fontSize: 8 }}>{k}</p>
+              <p className="mt-1 text-base font-bold tabular-nums">{val}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* by sport */}
       <section className="panel overflow-x-auto rounded-sm">
-        <p className="label-caps border-b border-border px-4 py-3">Performance by sport — every model, fully audited</p>
+        <p className="label-caps border-b border-border px-4 py-3">Performance by sport — current model, since {epochLabel}</p>
         <table className="w-full min-w-[720px] border-collapse font-mono2 text-xs">
           <thead>
             <tr className="border-b border-border text-left">

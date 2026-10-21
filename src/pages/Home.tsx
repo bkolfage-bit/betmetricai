@@ -145,8 +145,9 @@ export default function Home() {
             <div className="mt-8">
               <p className="mb-2 font-mono2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground/70">
                 {sport
-                  ? `Graded record — ${sport} only · ${perf.overall.total} pick${perf.overall.total === 1 ? "" : "s"}`
-                  : `Graded record — all sports · ${perf.overall.total} picks`}
+                  ? `Graded record — ${sport} · current model · ${perf.overall.total} pick${perf.overall.total === 1 ? "" : "s"}`
+                  : `Graded record — all sports · current model · ${perf.overall.total} picks`}
+                {perf.epoch ? ` · since ${new Date(perf.epoch).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
               </p>
               <div className="flex flex-wrap items-center gap-x-8 gap-y-3 font-mono2">
                 {[

@@ -9,6 +9,15 @@ import { americanPayout } from "../lib/edge";
 const when = (r: typeof pickHistory.$inferSelect): Date =>
   r.completedAt ?? r.placedAt;
 
+/**
+ * Stats epoch: the current model/configuration went live on 2026-10-12.
+ * Headline stats (and the units chart) measure from that point forward so
+ * they reflect the system as it actually runs today. Picks graded before
+ * the epoch are never deleted — they remain in pick_history and are
+ * returned as `allTime` for full transparency.
+ */
+const STATS_EPOCH = new Date("2026-10-12T00:00:00Z");
+
 function summarize(rows: Array<typeof pickHistory.$inferSelect>) {
   const wins = rows.filter((r) => r.result === "won").length;
   const losses = rows.filter((r) => r.result === "lost").length;
@@ -68,12 +77,15 @@ export const performanceRouter = createRouter({
       // timeline = real game-completion time (fall back to publication for
       // any row graded before completedAt existed)
       .sort((a, b) => when(a).getTime() - when(b).getTime());
-    const rows = input?.sport ? all.filter((r) => r.sportCode === input.sport) : all;
+    const allRows = input?.sport ? all.filter((r) => r.sportCode === input.sport) : all;
+    // headline stats measure the current model only — from the epoch forward
+    const rows = allRows.filter((r) => when(r) >= STATS_EPOCH);
 
     const overall = summarize(rows);
+    const allTime = summarize(allRows);
 
-    const bySport = new Map<string, typeof all>();
-    for (const r of all) {
+    const bySport = new Map<string, typeof rows>();
+    for (const r of rows) {
       const arr = bySport.get(r.sportCode) ?? [];
       arr.push(r);
       bySport.set(r.sportCode, arr);
@@ -124,6 +136,11 @@ export const performanceRouter = createRouter({
       months,
       curve,
       recent: rows.slice(-20).reverse(),
+      // transparency: the epoch the headline stats start from, and the
+      // complete unfiltered record (nothing deleted, nothing hidden)
+      epoch: STATS_EPOCH.toISOString(),
+      allTime,
+      preEpochCount: allRows.length - rows.length,
     };
   }),
 });
