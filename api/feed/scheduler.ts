@@ -42,6 +42,28 @@ const PROPS_INTERVAL_MS = 6 * 60 * 60 * 1000; // NHL props pull: 4x/day (paid)
 const PROPS_GRADE_INTERVAL_MS = 60 * 60 * 1000; // grade settled props hourly
 const DISCOVERY_INTERVAL_MS = 6 * 60 * 60 * 1000; // full-sport sweep: finds NEW events
 const STUCK_CHECK_INTERVAL_MS = 30 * 60 * 1000; // force-resync "live" events past max duration
+const GHOST_CHECK_INTERVAL_MS = 5 * 60 * 1000; // detect provider-corrupted zombie events
+/**
+ * GHOST GUARD — the provider intermittently corrupts closed events: it
+ * rewrites startTime to "now", flips status back to live/scheduled with a
+ * 0-0 or partial score, and keeps mirroring its frozen last-known prices
+ * into odds history. The reprice sweep then "revives" picks on games that
+ * finished days ago (the stale-board bug seen 3x in production).
+ *
+ * Detection needs no external calls and runs in every feed mode: a REAL
+ * live game constantly receives fresh market updates (provider last_update
+ * ≈ now); a ghost's market is closed, so every mirrored snapshot carries a
+ * provider timestamp frozen hours/days in the past. An open event whose
+ * newest provider update is over 6h old AND whose claimed start is >4h ago
+ * (provider clock skew tolerance) is a ghost by definition.
+ *
+ * Recovery: ask the provider /scores endpoint once per sport (1 credit) —
+ * if the game is completed there, finalize with the REAL score and grade;
+ * if the provider no longer knows the event at all, close it scoreless so
+ * it can never re-enter any processing window. Never invents a result.
+ */
+const GHOST_STALE_MS = 6 * 60 * 60 * 1000; // no fresh provider odds update in 6h
+const GHOST_AGE_MS = 4 * 60 * 60 * 1000; // claimed start more than 4h ago
 const MAX_GAME_MINUTES: Record<string, number> = {
   NFL: 330, NCAAF: 330, NBA: 240, NCAAB: 210, MLB: 360, NHL: 270,
   SOCCER: 210, TENNIS: 360, UFC: 480, GOLF: 600,
@@ -56,6 +78,7 @@ let lastSweepRun = 0;
 let lastPropsRun = 0;
 let lastPropsGradeRun = 0;
 let lastDiscoveryRun = 0;
+let lastGhostRun = 0;
 let lastStuckCheckRun = 0;
 
 let timer: NodeJS.Timeout | null = null;
@@ -156,6 +179,69 @@ async function tick(): Promise<void> {
         }
       } catch (e) {
         console.error("[stuck] check failed:", e instanceof Error ? e.message : e);
+      }
+    }
+
+    // ghost-event guard (free, runs in every mode): detect provider-corrupted
+    // zombie events BEFORE the reprice sweep can revive their picks
+    if (now - lastGhostRun >= GHOST_CHECK_INTERVAL_MS) {
+      lastGhostRun = now;
+      try {
+        const ghostDb = getDb();
+        const { sql } = await import("drizzle-orm");
+        const { sports, currentOdds } = await import("@db/schema");
+        const candidates = await ghostDb
+          .select({
+            id: events.id,
+            startTime: events.startTime,
+            sportCode: sports.code,
+          })
+          .from(events)
+          .innerJoin(sports, eq(sports.id, events.sportId))
+          .where(
+            and(
+              eq(events.provider, "THE_ODDS_API"),
+              eq(events.isDemo, false),
+              inArray(events.status, ["scheduled", "live"]),
+              lte(events.startTime, new Date(now - GHOST_AGE_MS)),
+            ),
+          );
+        // per-candidate freshness check: a real live game always has fresh
+        // provider odds updates; a ghost's are frozen at market close
+        const ghosts: Array<{ id: number; startTime: Date; sportCode: string }> = [];
+        for (const c of candidates) {
+          const [fresh] = await ghostDb
+            .select({ last: sql<Date>`MAX(${currentOdds.providerLastUpdate})` })
+            .from(currentOdds)
+            .where(eq(currentOdds.eventId, c.id));
+          const last = fresh?.last ? new Date(fresh.last).getTime() : 0;
+          if (now - last > GHOST_STALE_MS) ghosts.push(c);
+        }
+        if (ghosts.length > 0) {
+          const bySport = new Map<string, number[]>();
+          for (const g of ghosts) {
+            bySport.set(g.sportCode, [...(bySport.get(g.sportCode) ?? []), g.id]);
+          }
+          for (const [code, ids] of bySport) {
+            const r = await syncScores(code).catch(() => null);
+            const still = await ghostDb
+              .select({ id: events.id })
+              .from(events)
+              .where(and(inArray(events.id, ids), inArray(events.status, ["scheduled", "live"])));
+            for (const row of still) {
+              // provider no longer reports the event at all — it is over.
+              // Close it scoreless: settled picks keep their results, open
+              // picks simply leave the board; nothing is ever fabricated.
+              await ghostDb
+                .update(events)
+                .set({ status: "final", period: "CLOSED", clock: null })
+                .where(and(eq(events.id, row.id), inArray(events.status, ["scheduled", "live"])));
+              console.log(`[ghost] event ${row.id} (${code}): provider-corrupted zombie closed (scores resync: ${r ? `${r.updated} upd, ${r.finals} final, ${r.graded} graded` : "failed"})`);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("[ghost] check failed:", e instanceof Error ? e.message : e);
       }
     }
 
